@@ -9,6 +9,7 @@ import threading
 import webbrowser
 import time
 import requests
+import asyncio
 from requests.exceptions import ConnectionError
 
 # 添加项目根目录到PATH
@@ -45,9 +46,17 @@ def start_api_server_thread(host, port, debug=False):
     """在单独的线程中启动API服务器"""
     def _start_api():
         try:
-            start_api_server(host=host, port=port, workers=1, use_signals=False)
+            # 创建新的事件循环
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            # 运行异步API服务器
+            loop.run_until_complete(start_api_server(host=host, port=port, workers=1, use_signals=False))
+            loop.run_forever()
         except Exception as e:
             print(f"API服务器启动失败: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
     
     api_thread = threading.Thread(target=_start_api)
     api_thread.daemon = True

@@ -140,6 +140,20 @@ class SqliteMemory(MCPMemory):
         conn.commit()
         conn.close()
     
+    @staticmethod
+    def generate_memory_id(content: Any) -> str:
+        """生成记忆ID
+        
+        Args:
+            content: 记忆内容
+            
+        Returns:
+            生成的记忆ID
+        """
+        # 生成记忆ID格式: mem_timestamp_contenthash
+        memory_id = f"mem_{int(time.time())}_{hash(str(content))}"
+        return memory_id
+    
     async def add(self, content: Any, metadata: Dict = None) -> str:
         """添加新记忆
         
@@ -151,7 +165,7 @@ class SqliteMemory(MCPMemory):
             记忆ID
         """
         # 生成记忆ID
-        memory_id = f"mem_{int(time.time())}_{hash(str(content))}"
+        memory_id = self.generate_memory_id(content)
         
         # 处理元数据
         if not metadata:

@@ -35,8 +35,13 @@ from providers.factory import create_provider
 class MCPEnhancedAssistant:
     """增强版 MCP 助手，提供文件保存和 AI 对话请求等功能"""
     
-    def __init__(self, name: str):
-        """初始化基本属性，真正的初始化通过_initialize方法完成"""
+    def __init__(self, name: str, assistant_id: Optional[str] = None):
+        """初始化基本属性，真正的初始化通过_initialize方法完成
+        
+        Args:
+            name: 助手名称
+            assistant_id: 可选的助手ID，如不提供则自动生成
+        """
         self.name = name
         self.agent = None
         self.memory = None
@@ -57,7 +62,7 @@ class MCPEnhancedAssistant:
         self.auto_saved_files = {}  # 已自动保存的文件映射 {原始路径: 保存路径}
         
         # 初始化状态跟踪
-        self.assistant_id = str(uuid.uuid4())
+        self.assistant_id = assistant_id if assistant_id else str(uuid.uuid4())
         self.current_status = {
             "assistant_id": self.assistant_id,
             "status": "idle",
@@ -250,6 +255,9 @@ class MCPEnhancedAssistant:
                         metadata=memory_metadata or {"type": "ai_dialog"}
                     )
                     self.logger.log_system_event("记忆", f"会话已添加到记忆系统，ID: {memory_id}")
+                    
+                    # 记录记忆ID和助手ID的关系
+                    self.logger.log_system_event("记忆", f"记忆ID: {memory_id}, 助手ID: {self.assistant_id}")
                 except Exception as e:
                     self.logger.log_system_event("错误", f"记忆保存失败: {str(e)}")
             
@@ -454,6 +462,21 @@ class MCPEnhancedAssistant:
                         metadata=memory_metadata
                     )
                     self.logger.log_system_event("记忆", f"会话已添加到记忆系统，ID: {memory_id}")
+                    
+                    # 记录记忆ID和助手ID的关系
+                    self.logger.log_system_event("记忆", f"记忆ID: {memory_id}, 助手ID: {self.assistant_id}")
+                    
+                    # 尝试通知API服务器assistant_id已更新
+                    try:
+                        api_url = f"{self.api_base_url}/assistants/{memory_id}/status"
+                        requests.post(
+                            api_url,
+                            json=self.current_status,
+                            timeout=1  # 短超时，避免阻塞
+                        )
+                    except Exception as e:
+                        # 忽略API通信错误，不影响主要流程
+                        self.logger.log_system_event("警告", f"状态更新通信失败: {str(e)}")
                 except Exception as e:
                     self.logger.log_system_event("错误", f"记忆保存失败: {str(e)}")
             
@@ -756,6 +779,11 @@ class MCPEnhancedAssistant:
                 self.logger.log_system_event("错误", error_msg)
                 return f"恢复对话失败: {error_msg}"
             
+            # 使用记忆ID作为助手ID（保持一致）
+            self.assistant_id = memory_id
+            self.current_status["assistant_id"] = memory_id
+            self.logger.log_system_event("记忆", f"已将助手ID更新为记忆ID: {memory_id}")
+            
             # 尝试获取记忆内容
             memory_item = await self.memory.get(memory_id)
             
@@ -1042,7 +1070,8 @@ class MCPEnhancedAssistant:
                     api_key: Optional[str] = None,
                     api_base: Optional[str] = None,
                     enable_multimodal: bool = True,
-                    enable_auto_save: bool = True):
+                    enable_auto_save: bool = True,
+                    assistant_id: Optional[str] = None):
         """异步工厂方法，创建并初始化增强版助手实例
         
         Args:
@@ -1056,11 +1085,22 @@ class MCPEnhancedAssistant:
             api_base: API基础URL
             enable_multimodal: 是否启用多模态处理
             enable_auto_save: 是否启用自动保存功能
+            assistant_id: 可选的助手ID，如不提供则自动生成
             
         Returns:
             初始化好的助手实例
         """
-        instance = cls(name)
+        # 如果没有提供助手ID，提前生成一个记忆ID作为助手ID
+        if not assistant_id:
+            # 导入SqliteMemory以使用其ID生成逻辑
+            from core.mcp_memory import SqliteMemory
+            # 生成一个预测性的记忆ID
+            predictive_content = f"{name}_init_{time.time()}"
+            assistant_id = SqliteMemory.generate_memory_id(predictive_content)
+            print(f"预生成记忆ID作为助手ID: {assistant_id}")
+            
+        # 使用预生成的记忆ID创建助手实例
+        instance = cls(name, assistant_id)
         
         # 记录模型信息
         instance.provider_name = provider_name

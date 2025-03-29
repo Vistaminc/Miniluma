@@ -54,3 +54,5 @@ testing/
 test_config_loader.py
 test_config.py
 test_mcp_logging.py
+restore_memory.py
+assistants/

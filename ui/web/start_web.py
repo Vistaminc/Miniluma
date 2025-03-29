@@ -45,7 +45,9 @@ def start_api_server_thread(host, port, debug=False):
     """在单独的线程中启动API服务器"""
     def _start_api():
         try:
-            start_api_server(host=host, port=port, workers=1, use_signals=False)
+            # 使用asyncio.run运行异步协程函数
+            import asyncio
+            asyncio.run(start_api_server(host=host, port=port, workers=1, use_signals=False))
         except Exception as e:
             print(f"API服务器启动失败: {str(e)}")
     

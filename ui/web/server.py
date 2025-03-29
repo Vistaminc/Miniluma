@@ -6,6 +6,7 @@ import os
 import sys
 import json
 import asyncio
+import traceback
 from typing import Dict, List, Any, Optional
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, send_from_directory
 import requests
@@ -24,11 +25,46 @@ app = Flask(__name__,
 app.secret_key = str(uuid.uuid4())  # 用于session
 API_BASE_URL = "http://localhost:8000"  # MiniLuma API地址
 
+# 添加全局错误处理
+@app.errorhandler(Exception)
+def handle_exception(e):
+    """全局异常处理"""
+    # 记录详细的错误信息
+    error_message = f"服务器错误: {str(e)}\n"
+    error_message += traceback.format_exc()
+    print("=" * 50)
+    print("服务器发生错误:")
+    print(error_message)
+    print("=" * 50)
+    
+    # 返回错误页面或JSON
+    if request.path.startswith('/api/'):
+        return jsonify({"error": str(e), "details": traceback.format_exc()}), 500
+    else:
+        return f"""
+        <html>
+            <head><title>服务器错误</title></head>
+            <body>
+                <h1>服务器错误</h1>
+                <p>非常抱歉，服务器遇到了一个问题：</p>
+                <pre>{str(e)}</pre>
+                <h2>详细信息：</h2>
+                <pre>{traceback.format_exc()}</pre>
+            </body>
+        </html>
+        """, 500
+
 # 主页
 @app.route('/')
 def index():
     """渲染主页"""
     return render_template('index.html')
+
+# 测试页面
+@app.route('/test')
+def test_page():
+    """渲染测试页面"""
+    return render_template('test.html')
 
 # 聊天界面
 @app.route('/chat')
@@ -39,6 +75,17 @@ def chat():
         # 如果没有指定助手ID，重定向到创建助手页面
         return redirect(url_for('new_assistant'))
     
+    # 从会话中获取助手名称
+    assistant_name = session.get(f'assistant_name_{assistant_id}', 'MiniLuma')
+    
+    return render_template('chat.html', 
+                          assistant_id=assistant_id,
+                          assistant_name=assistant_name)
+
+# 聊天界面 - 路径参数版本
+@app.route('/chat/<assistant_id>')
+def chat_with_id(assistant_id):
+    """使用路径参数渲染聊天界面"""
     # 从会话中获取助手名称
     assistant_name = session.get(f'assistant_name_{assistant_id}', 'MiniLuma')
     
@@ -172,34 +219,144 @@ def get_conversation_history(assistant_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# 查看代码文件
+@app.route('/view-code/<assistant_id>/<path:filename>')
+def view_code(assistant_id, filename):
+    """使用代码高亮查看生成的代码文件"""
+    try:
+        # 获取纯文件名（移除任何路径信息）
+        clean_filename = os.path.basename(filename)
+        
+        # 调用MiniLuma API获取文件内容
+        try:
+            # 先尝试使用文件内容API
+            content_response = requests.get(f"{API_BASE_URL}/assistants/{assistant_id}/files/content", 
+                                          params={"file_name": clean_filename})
+            content_response.raise_for_status()
+            file_content = content_response.json().get("content", "")
+        except Exception as e:
+            print(f"无法获取文件内容: {e}")
+            # 尝试备用方法
+            try:
+                # 备用：从文件下载API获取
+                download_response = requests.get(f"{API_BASE_URL}/assistants/{assistant_id}/download/{clean_filename}")
+                download_response.raise_for_status()
+                file_content = download_response.content.decode('utf-8', errors='replace')
+            except Exception as download_error:
+                print(f"备用方法也失败: {download_error}")
+                file_content = f"// 无法加载文件内容: {str(e)}\n// 然后: {str(download_error)}"
+        
+        # 获取文件内容
+        # file_content = response.content.decode('utf-8')
+        
+        # 根据文件扩展名确定语言
+        file_extension = clean_filename.split('.')[-1].lower() if '.' in clean_filename else ''
+        code_language = file_extension
+        
+        # 映射扩展名到highlight.js支持的语言
+        language_mapping = {
+            'js': 'javascript',
+            'ts': 'typescript',
+            'py': 'python',
+            'html': 'html',
+            'htm': 'html',
+            'css': 'css',
+            'scss': 'scss',
+            'json': 'json',
+            'md': 'markdown',
+            'java': 'java',
+            'cpp': 'cpp',
+            'c': 'c',
+            'cs': 'csharp',
+            'rb': 'ruby',
+            'php': 'php',
+            'go': 'go',
+            'sh': 'bash',
+            'bat': 'batch',
+            'ps1': 'powershell',
+            'sql': 'sql',
+            'xml': 'xml',
+            'yaml': 'yaml',
+            'yml': 'yaml',
+            'txt': 'plaintext'
+        }
+        
+        code_language = language_mapping.get(file_extension, file_extension)
+        
+        # 从会话中获取助手名称
+        assistant_name = session.get(f'assistant_name_{assistant_id}', 'MiniLuma')
+        
+        # 尝试获取文件路径(可能不存在)
+        try:
+            files_response = requests.get(f"{API_BASE_URL}/assistants/{assistant_id}/files")
+            files_response.raise_for_status()
+            files_data = files_response.json()
+            file_path = next((path for path in files_data.get("files", {}).values() if os.path.basename(path) == clean_filename), "")
+        except:
+            file_path = ""
+        
+        return render_template('view_code.html',
+                               assistant_id=assistant_id,
+                               assistant_name=assistant_name,
+                               file_name=clean_filename,
+                               file_path=file_path,
+                               file_extension=file_extension,
+                               file_content=file_content,
+                               code_language=code_language)
+    except Exception as e:
+        return f"<h1>错误</h1><p>无法加载文件: {str(e)}</p><a href='/chat?assistant_id={assistant_id}'>返回对话</a>", 500
+
 # 文件下载代理
 @app.route('/api/download/<assistant_id>/<path:filename>')
 def download_file(assistant_id, filename):
     """下载助手生成的文件"""
     try:
-        # 从MiniLuma API获取文件
-        response = requests.get(
-            f"{API_BASE_URL}/assistants/{assistant_id}/download/{filename}",
-            stream=True
-        )
-        response.raise_for_status()
+        # 获取纯文件名（移除任何路径信息）
+        clean_filename = os.path.basename(filename)
         
-        # 设置响应头
-        headers = {}
-        if 'Content-Type' in response.headers:
-            headers['Content-Type'] = response.headers['Content-Type']
-        if 'Content-Disposition' in response.headers:
-            headers['Content-Disposition'] = response.headers['Content-Disposition']
+        # 调用MiniLuma API下载文件
+        try:
+            # 尝试使用download API端点
+            response = requests.get(f"{API_BASE_URL}/assistants/{assistant_id}/download/{clean_filename}", stream=True)
+            response.raise_for_status()
+        except Exception as e:
+            print(f"使用download API失败: {e}")
+            # 尝试备用API
+            response = requests.get(f"{API_BASE_URL}/assistants/{assistant_id}/files/content", 
+                                  params={"file_name": clean_filename})
+            response.raise_for_status()
             
-        # 返回文件内容
-        return response.content, 200, headers
+            # 如果是JSON响应，提取内容并转为二进制
+            if 'application/json' in response.headers.get('Content-Type', ''):
+                content_data = response.json()
+                response._content = content_data.get("content", "").encode('utf-8')
+        
+        # 创建临时目录用于保存文件
+        temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'temp')
+        os.makedirs(temp_dir, exist_ok=True)
+        
+        # 保存文件到临时目录
+        file_path = os.path.join(temp_dir, clean_filename)
+        with open(file_path, 'wb') as f:
+            if hasattr(response, 'iter_content'):
+                for chunk in response.iter_content(chunk_size=8192): 
+                    f.write(chunk)
+            else:
+                f.write(response.content)
+        
+        # 从临时目录提供文件下载
+        return send_from_directory(temp_dir, clean_filename, as_attachment=True)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        error_msg = f"下载文件失败: {str(e)}"
+        print(error_msg)
+        return jsonify({"error": error_msg}), 500
 
 # 启动服务器
 def run_web_server(host="0.0.0.0", port=8080, debug=True):
     """启动Web服务器"""
-    app.run(host=host, port=port, debug=debug)
+    app.debug = True  # 启用调试模式以获取详细错误信息
+    print("Web服务器调试模式已开启...")
+    app.run(host=host, port=port)
 
 if __name__ == "__main__":
     run_web_server()

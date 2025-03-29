@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}查看文件 - {{ file_name }}{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-800">{{ file_name }}</h1>
+            <p class="text-sm text-gray-600">{{ file_path }}</p>
+        </div>
+        <div>
+            <a href="/api/download/{{ assistant_id }}/{{ file_name }}" 
+               class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md inline-flex items-center"
+               download="{{ file_name }}">
+                <i class="fas fa-download mr-2"></i> 下载文件
+            </a>
+            <a href="/chat/{{ assistant_id }}" 
+               class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md inline-flex items-center ml-2">
+                <i class="fas fa-arrow-left mr-2"></i> 返回对话
+            </a>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+        <div class="p-1 bg-gray-100 border-b flex justify-between items-center">
+            <div class="flex items-center text-sm text-gray-600">
+                <i class="fas fa-code mr-2"></i>
+                <span>{{ file_extension }}</span>
+            </div>
+            <div>
+                <button id="copyBtn" class="text-gray-500 hover:text-gray-700 px-2 py-1 text-sm">
+                    <i class="fas fa-copy mr-1"></i> 复制代码
+                </button>
+            </div>
+        </div>
+        
+        <!-- 代码内容，会被自动高亮 -->
+        <div class="p-0 overflow-auto">
+            <pre class="m-0"><code class="language-{{ code_language }}">{{ file_content }}</code></pre>
+        </div>
+    </div>
+</div>
+
+<!-- 复制成功提示 -->
+<div id="copyAlert" class="fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg transform transition-transform duration-300 translate-y-[-100px]">
+    <i class="fas fa-check-circle mr-2"></i> 代码已复制到剪贴板
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 应用代码高亮
+    document.querySelectorAll('pre code').forEach((block) => {
+        hljs.highlightElement(block);
+    });
+    
+    // 复制代码功能
+    const copyBtn = document.getElementById('copyBtn');
+    const copyAlert = document.getElementById('copyAlert');
+    const codeElement = document.querySelector('pre code');
+    
+    copyBtn.addEventListener('click', function() {
+        // 获取代码内容
+        const codeText = codeElement.textContent;
+        
+        // 复制到剪贴板
+        navigator.clipboard.writeText(codeText).then(function() {
+            // 显示成功提示
+            copyAlert.style.transform = 'translateY(0)';
+            
+            // 3秒后隐藏提示
+            setTimeout(function() {
+                copyAlert.style.transform = 'translateY(-100px)';
+            }, 3000);
+        }).catch(function(err) {
+            console.error('无法复制文本: ', err);
+            alert('复制失败，请手动选择并复制代码');
+        });
+    });
+});
+</script>
+{% endblock %}
