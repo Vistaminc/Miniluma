@@ -68,6 +68,7 @@ class MessageResponse(BaseModel):
 class AssistantCreateRequest(BaseModel):
     """创建助手请求模型"""
     name: str = Field("MiniLuma", description="助手名称")
+    assistant_mode: Optional[str] = Field("mcp", description="助手模式：simple/multi_agent/custom/mcp")
     provider_name: Optional[str] = Field(None, description="LLM提供商名称")
     model: Optional[str] = Field(None, description="LLM模型名称")
     system_prompt: Optional[str] = Field(None, description="系统提示词")
@@ -124,13 +125,49 @@ async def create_assistant(request: AssistantCreateRequest):
         新创建的助手信息
     """
     try:
-        # 创建助手实例
-        assistant = await MCPEnhancedAssistant.create(
-            name=request.name,
-            provider_name=request.provider_name,
-            model=request.model,
-            system_prompt=request.system_prompt
-        )
+        # 根据选择的模式创建不同类型的助手
+        assistant_mode = request.assistant_mode or "mcp"
+        
+        if assistant_mode == "mcp":
+            # 创建MCP增强助手实例
+            assistant = await MCPEnhancedAssistant.create(
+                name=request.name,
+                provider_name=request.provider_name,
+                model=request.model,
+                system_prompt=request.system_prompt
+            )
+        elif assistant_mode == "simple":
+            # 简单助手模式 - 目前暂时使用MCPEnhancedAssistant作为后备
+            assistant = await MCPEnhancedAssistant.create(
+                name=request.name,
+                provider_name=request.provider_name,
+                model=request.model,
+                system_prompt=request.system_prompt
+            )
+        elif assistant_mode == "multi_agent":
+            # 多代理系统 - 目前暂时使用MCPEnhancedAssistant作为后备
+            assistant = await MCPEnhancedAssistant.create(
+                name=request.name,
+                provider_name=request.provider_name,
+                model=request.model,
+                system_prompt=request.system_prompt
+            )
+        elif assistant_mode == "custom":
+            # 自定义模式 - 目前暂时使用MCPEnhancedAssistant作为后备
+            assistant = await MCPEnhancedAssistant.create(
+                name=request.name,
+                provider_name=request.provider_name,
+                model=request.model,
+                system_prompt=request.system_prompt
+            )
+        else:
+            # 未知模式，使用默认的MCP增强助手
+            assistant = await MCPEnhancedAssistant.create(
+                name=request.name,
+                provider_name=request.provider_name,
+                model=request.model,
+                system_prompt=request.system_prompt
+            )
         
         # 生成唯一的助手ID
         assistant_id = str(uuid.uuid4())
@@ -146,14 +183,23 @@ async def create_assistant(request: AssistantCreateRequest):
         # 保存助手实例
         active_assistants[assistant_id] = assistant
         
+        # 存储助手模式信息
+        assistant_status[assistant_id] = AssistantStatus(
+            assistant_id=assistant_id,
+            status="idle",
+            current_operation=None,
+            operation_details=f"模式: {assistant_mode}"
+        )
+        
         # 返回助手信息
         return {
             "assistant_id": assistant_id,
             "name": assistant.name,
             "conversation_id": assistant.conversation_id,
-            "provider": assistant.provider_name,
-            "model": assistant.model
+            "provider": assistant.provider.provider_name if hasattr(assistant, 'provider') and assistant.provider else "unknown",
+            "model": assistant.provider.model if hasattr(assistant, 'provider') and assistant.provider else "unknown"
         }
+    
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"创建助手失败: {str(e)}")
 

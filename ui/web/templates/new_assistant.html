@@ -13,6 +13,16 @@
             </div>
             
             <div class="form-group">
+                <label for="assistantMode">助手模式</label>
+                <select id="assistantMode" name="assistant_mode">
+                    <option value="simple" selected>简单助手模式 - 单代理与工具集成</option>
+                    <option value="multi_agent">多代理系统 - 复杂任务分解与协作</option>
+                    <option value="custom">自定义模式 - 配置自己的代理参数</option>
+                    <option value="mcp">MCP 增强助手 - 支持文件保存和 AI 对话的高级助手</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
                 <label for="providerName">LLM提供商</label>
                 <select id="providerName" name="provider_name">
                     <option value="deepseek" selected>DeepSeek</option>
@@ -76,6 +86,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // 收集表单数据
         const formData = {
             name: document.getElementById('assistantName').value,
+            assistant_mode: document.getElementById('assistantMode').value,
             provider_name: document.getElementById('providerName').value,
             model: document.getElementById('modelName').value,
             system_prompt: document.getElementById('systemPrompt').value,
@@ -103,8 +114,9 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const data = await response.json();
             
-            // 创建成功，重定向到聊天界面
+            // 创建成功后重定向到聊天页面
             window.location.href = `/chat?assistant_id=${data.assistant_id}`;
+            
         } catch (error) {
             // 显示错误信息
             errorDiv.textContent = error.message;
@@ -113,30 +125,27 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // 根据选择的提供商更新模型选项
-    document.getElementById('providerName').addEventListener('change', function() {
+    // 根据选择的提供商动态更新模型下拉列表
+    const providerSelect = document.getElementById('providerName');
+    const modelSelect = document.getElementById('modelName');
+    
+    providerSelect.addEventListener('change', function() {
         const provider = this.value;
-        const modelSelect = document.getElementById('modelName');
         
-        // 清空现有选项
+        // 清空当前选项
         modelSelect.innerHTML = '';
         
-        // 根据提供商添加相应的模型选项
-        switch(provider) {
-            case 'deepseek':
-                addOption(modelSelect, 'deepseek-chat', 'DeepSeek Chat');
-                break;
-            case 'openai':
-                addOption(modelSelect, 'gpt-4', 'GPT-4');
-                addOption(modelSelect, 'gpt-3.5-turbo', 'GPT-3.5 Turbo');
-                break;
-            case 'anthropic':
-                addOption(modelSelect, 'claude-3-opus', 'Claude 3 Opus');
-                addOption(modelSelect, 'claude-3-sonnet', 'Claude 3 Sonnet');
-                break;
-            case 'gemini':
-                addOption(modelSelect, 'gemini-pro', 'Gemini Pro');
-                break;
+        // 根据选择的提供商添加对应的模型选项
+        if (provider === 'deepseek') {
+            addOption(modelSelect, 'deepseek-chat', 'DeepSeek Chat');
+        } else if (provider === 'openai') {
+            addOption(modelSelect, 'gpt-4', 'GPT-4');
+            addOption(modelSelect, 'gpt-3.5-turbo', 'GPT-3.5 Turbo');
+        } else if (provider === 'anthropic') {
+            addOption(modelSelect, 'claude-3-opus', 'Claude 3 Opus');
+            addOption(modelSelect, 'claude-3-sonnet', 'Claude 3 Sonnet');
+        } else if (provider === 'gemini') {
+            addOption(modelSelect, 'gemini-pro', 'Gemini Pro');
         }
     });
     

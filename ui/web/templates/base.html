@@ -8,6 +8,137 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
     {% block extra_css %}{% endblock %}
+    <style>
+        /* 导航链接统一样式 */
+        .nav-item {
+            position: relative;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            color: #666;
+            font-size: 14px;
+            margin-left: 15px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        
+        .nav-item:hover {
+            background-color: rgba(82, 158, 204, 0.1);
+            color: #3498db;
+        }
+        
+        .nav-item i {
+            margin-right: 5px;
+        }
+        
+        .nav-item a {
+            color: inherit;
+            text-decoration: none;
+        }
+        
+        /* 赞赏按钮和弹窗样式 */
+        .donate-popup {
+            position: absolute;
+            top: 40px;
+            right: 0;
+            width: 320px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            padding: 15px;
+            z-index: 100;
+            display: none;
+            transition: opacity 0.3s;
+            text-align: center;
+        }
+        
+        .donate-popup h3 {
+            margin-top: 0;
+            color: #333;
+            font-size: 16px;
+            margin-bottom: 8px;
+        }
+        
+        .donate-popup h4 {
+            margin: 0 0 15px;
+            color: #ff6b6b;
+            font-size: 14px;
+            font-weight: normal;
+        }
+        
+        .donate-qr-container {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .donate-qr-item {
+            width: 45%;
+        }
+        
+        .donate-qr-item img {
+            width: 100%;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .donate-qr-item p {
+            margin: 5px 0 0;
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .developer-info {
+            margin-top: 15px;
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+            border-top: 1px dashed #eee;
+            padding-top: 10px;
+        }
+        
+        .developer-info p {
+            margin: 3px 0;
+        }
+        
+        .developer-contact {
+            margin-top: 5px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .developer-contact a {
+            color: #3498db;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        
+        .developer-contact a:hover {
+            text-decoration: underline;
+        }
+        
+        /* 页脚样式压缩 */
+        .app-footer {
+            background-color: #f8f9fa;
+            border-top: 1px solid #eaeaea;
+            padding: 5px 0;
+            font-size: 12px;
+            color: #666;
+            margin-top: 10px;
+        }
+        
+        .footer-content {
+            text-align: center;
+        }
+        
+        .footer-content p {
+            margin: 0;
+            padding: 0;
+        }
+    </style>
 </head>
 <body>
     <div class="app-container">
@@ -19,9 +150,45 @@
             </div>
             <nav class="app-nav">
                 <ul>
-                    <li><a href="/" class="nav-link"><i class="fas fa-home"></i> 首页</a></li>
-                    <li><a href="/new-assistant" class="nav-link"><i class="fas fa-plus-circle"></i> 新建助手</a></li>
-                    <li><a href="https://github.com/Vistaminc/Miniluma" target="_blank" class="nav-link"><i class="fab fa-github"></i> GitHub</a></li>
+                    <li class="nav-item">
+                        <a href="/" class="nav-link"><i class="fas fa-home"></i> 首页</a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="/new-assistant" class="nav-link"><i class="fas fa-plus-circle"></i> 新建助手</a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="https://github.com/Vistaminc/Miniluma" target="_blank" class="nav-link"><i class="fab fa-github"></i> GitHub</a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="https://miniluma.readthedocs.io/" target="_blank" class="nav-link"><i class="fas fa-book"></i> 官方文档</a>
+                    </li>
+                    <li class="nav-item">
+                        <i class="fas fa-gift" style="color: #ff6b6b;"></i> 赞赏支持
+                        <div class="donate-popup">
+                            <h3>❤️ 请作者喝杯咖啡吧 ☕</h3>
+                            <h4>您的支持是我们持续创新的动力！</h4>
+                            <div class="donate-qr-container">
+                                <div class="donate-qr-item">
+                                    <img src="{{ url_for('static', filename='img/zanshang/wechat.jpg') }}" alt="微信赞赏码">
+                                    <p>微信赞赏</p>
+                                </div>
+                                <div class="donate-qr-item">
+                                    <img src="{{ url_for('static', filename='img/zanshang/zfb.jpg') }}" alt="支付宝赞赏码">
+                                    <p>支付宝赞赏</p>
+                                </div>
+                            </div>
+                            <div class="developer-info">
+                                <p><strong>开发者：Vistamin团队</strong></p>
+                                <p>来自河南·郑州的高中生团队</p>
+                                <p>我们致力于打造智能、高效、开源的AI助手系统</p>
+                                <p>每一笔赞赏都将用于服务维护和功能开发</p>
+                                <div class="developer-contact">
+                                    <a href="vistamin@outlook.com"><i class="fas fa-envelope"></i> 邮箱</a>
+                                    <a href="https://t.me/blank" target="_blank"><i class="fab fa-telegram"></i> Telegram</a>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
                 </ul>
             </nav>
         </header>
@@ -32,12 +199,67 @@
 
         <footer class="app-footer">
             <div class="footer-content">
-                <p>&copy; 2025 MiniLuma. 基于AI驱动的智能助手系统。</p>
+                <p>&copy; 2025 MiniLuma. 基于AI驱动的智能助手系统。Copyright &copy; 2025 Vistamin. All rights reserved. </p>
             </div>
         </footer>
     </div>
 
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     {% block extra_js %}{% endblock %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 获取赞赏按钮和弹窗元素
+            const donateBtn = document.querySelector('.nav-item i.fa-gift').parentNode;
+            const donatePopup = donateBtn.querySelector('.donate-popup');
+            let isClickActivated = false; // 记录是否通过点击激活
+            
+            // 点击按钮切换弹窗显示状态
+            donateBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (donatePopup.style.display === 'block' && isClickActivated) {
+                    donatePopup.style.display = 'none';
+                    isClickActivated = false;
+                } else {
+                    donatePopup.style.display = 'block';
+                    isClickActivated = true;
+                }
+            });
+            
+            // 鼠标悬停在按钮上时显示弹窗
+            donateBtn.addEventListener('mouseenter', function() {
+                if (!isClickActivated) { // 只有在非点击状态下才触发悬浮显示
+                    donatePopup.style.display = 'block';
+                }
+            });
+            
+            // 鼠标离开按钮和弹窗时隐藏弹窗
+            function handleMouseLeave(e) {
+                if (isClickActivated) return; // 如果是点击激活的不处理
+                
+                // 检查鼠标是否移到了按钮或弹窗上
+                const relatedTarget = e.relatedTarget;
+                if (!donateBtn.contains(relatedTarget) && !donatePopup.contains(relatedTarget)) {
+                    donatePopup.style.display = 'none';
+                }
+            }
+            
+            // 为按钮和弹窗添加鼠标离开事件
+            donateBtn.addEventListener('mouseleave', handleMouseLeave);
+            donatePopup.addEventListener('mouseleave', handleMouseLeave);
+            
+            // 点击弹窗内部时阻止事件冒泡
+            donatePopup.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
+            
+            // 点击页面其他区域时关闭弹窗
+            document.addEventListener('click', function() {
+                if (donatePopup.style.display === 'block') {
+                    donatePopup.style.display = 'none';
+                    isClickActivated = false;
+                }
+            });
+        });
+    </script>
 </body>
 </html>
