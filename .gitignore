@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 虚拟环境
+venv/
+ENV/
+
+# 配置和敏感信息
+config/config_global.toml
+.env
+*.pem
+*.key
+
+# 缓存和临时文件
+*.swp
+.DS_Store
+.idea/
+.vscode/
+.history/
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+
+# 日志和输出
+logs/
+results/
+*.log
+main_copy.py
+
+# 测试文件
+docs/
+tests/
+tools/
+testing/
+test_config_loader.py
+test_config.py
+test_mcp_logging.py

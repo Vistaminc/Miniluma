@@ -1,0 +1,55 @@
+# MiniLuma 默认配置文件
+
+# 全局设置
+[global]
+# 是否显示代理思考过程 
+show_thinking = false 
+# 默认语言
+language = "zh-CN"
+
+# OpenAI 配置
+[openai]
+model = "gpt-4"
+api_key = ""
+# 如果使用反向代理或中转，可以设置 base_url
+base_url = ""
+# 模型参数设置
+max_tokens = 4096
+temperature = 0.7
+
+# DeepSeek 配置
+[deepseek]
+model = "deepseek-chat"
+api_key = ""
+base_url = "https://api.deepseek.com/v1/"
+max_tokens = 4096
+temperature = 0.0
+
+# 硅基流动配置
+[silicon_flow]
+model = "sf-plus"
+api_key = ""
+base_url = "https://api.siliconflow.cn/v1/"
+max_tokens = 4096
+temperature = 0.7
+
+# 代理设置
+[agent]
+# 默认使用的LLM提供商
+default_provider = "openai"
+# 系统提示词
+system_prompt = "你是一个智能助手，帮助用户解决各种问题。"
+# 记忆容量
+memory_limit = 10
+
+# 工具设置
+[tools]
+# 启用的工具列表
+enabled = ["search", "calculator", "weather"]
+
+# UI设置
+[ui]
+# 主题颜色
+theme = "blue"
+# 是否在终端中使用彩色输出
+use_colors = true
