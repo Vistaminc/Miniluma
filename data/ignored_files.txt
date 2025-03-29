@@ -1,0 +1,36 @@
+# 此文件列出不会被自动移动的文件
+# 每行一个文件名，支持通配符
+# 注释以#开头
+
+# 项目文件
+LICENSE
+README
+README.md
+requirements.txt
+setup.py
+setup.cfg
+pyproject.toml
+.env
+.env.*
+.gitignore
+.gitattributes
+.editorconfig
+main_cn.py
+main.py
+LICENSE
+
+
+# 配置文件
+config.json
+config.yaml
+config.yml
+config.ini
+settings.json
+
+# 编辑器文件
+.vscode/*
+.idea/*
+*.iml
+
+# 日志文件
+*.log

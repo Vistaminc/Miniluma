@@ -116,6 +116,26 @@ class FileManager:
         
         return file_path
     
+    def save_file_to_path(self, content: str, file_path: str) -> str:
+        """保存文本内容到指定的完整文件路径。
+        
+        Args:
+            content: 要保存的文本内容
+            file_path: 完整的文件保存路径，包括文件名
+            
+        Returns:
+            保存的文件的完整路径
+        """
+        # 确保目标目录存在
+        target_dir = os.path.dirname(file_path)
+        self._ensure_dir_exists(target_dir)
+        
+        # 写入内容
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(content)
+        
+        return file_path
+    
     def save_binary_file(self, content: bytes, filename: str, subdir: str = None) -> str:
         """保存二进制内容到文件。
         
@@ -173,6 +193,25 @@ class FileManager:
         
         # 完整目标文件路径
         target_path = os.path.join(target_dir, target_filename)
+        
+        # 复制文件
+        shutil.copy2(source_path, target_path)
+        
+        return target_path
+    
+    def copy_file_to_path(self, source_path: str, target_path: str) -> str:
+        """将文件复制到指定的完整路径。
+        
+        Args:
+            source_path: 源文件路径
+            target_path: 目标文件完整路径
+            
+        Returns:
+            复制后的文件路径
+        """
+        # 确保目标目录存在
+        target_dir = os.path.dirname(target_path)
+        self._ensure_dir_exists(target_dir)
         
         # 复制文件
         shutil.copy2(source_path, target_path)

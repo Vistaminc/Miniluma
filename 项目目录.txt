@@ -1,0 +1,91 @@
+Miniluma/
+├── .git/                          # Git版本控制目录
+├── .gitignore                     # Git忽略文件
+├── LICENSE                        # 许可证文件
+├── README.md                      # 项目说明文档
+├── config/                        # 配置目录
+│   ├── __pycache__/
+│   ├── config_global.example.toml # 全局配置示例
+│   └── config_global.toml         # 全局配置文件
+├── core/                          # 核心功能目录
+│   ├── __init__.py                # 初始化文件
+│   ├── __pycache__/
+│   ├── agent.py                   # 代理实现
+│   ├── ai_connector.py            # AI连接器
+│   ├── config.py                  # 配置实现
+│   ├── context.py                 # 上下文管理
+│   ├── mcp.py                     # MCP主实现
+│   ├── mcp_agent.py               # MCP代理
+│   ├── mcp_feedback.py            # MCP反馈系统
+│   ├── mcp_memory.py              # MCP记忆系统
+│   ├── mcp_multimodal.py          # MCP多模态支持
+│   ├── mcp_plugins.py             # MCP插件系统
+│   ├── mcp_system.py              # MCP系统组件
+│   ├── memory.py                  # 记忆实现
+│   ├── planner.py                 # 规划器
+│   └── reactor.py                 # 响应器
+├── docs/                          # 文档目录
+│   ├── api/                       # API文档目录 (空)
+│   ├── guides/                    # 指南文档目录 (空)
+│   └── owl_openmanus_analysis.md  # OWL分析文档
+├── examples/                      # 示例目录
+│   ├── __init__.py                # 初始化文件
+│   ├── __pycache__/
+│   ├── mcp_advanced_assistant.py  # 高级助手示例
+│   ├── mcp_assistant.py           # MCP助手示例
+│   ├── mcp_enhanced_assistant.py  # 增强助手示例
+│   ├── multi_agent_example.py     # 多代理示例
+│   └── simple_assistant.py        # 简单助手示例
+├── llm/                           # LLM相关目录
+│   ├── __init__.py                # 初始化文件
+│   ├── __pycache__/
+│   ├── base.py                    # 基础实现
+│   ├── deepseek.py                # Deepseek模型支持
+│   ├── openai.py                  # OpenAI模型支持
+│   └── silicon_flow.py            # Silicon Flow模型支持
+├── logs/                          # 日志目录
+├── main.py                        # 主程序入口
+├── main_cn.py                     # 中文版主程序入口
+├── plugins/                       # 插件目录 (空)
+├── providers/                     # 提供者目录
+│   ├── __init__.py                # 初始化文件
+│   ├── __pycache__/
+│   ├── assistant_factory.py       # 助手工厂
+│   ├── base.py                    # 基础实现
+│   ├── factory.py                 # 工厂实现
+│   └── mock_provider.py           # 模拟提供者
+├── requirements.txt               # 依赖项列表
+├── results/                       # 结果输出目录 (暂时更改在根目录生成results目录)
+├── testing/                       # 测试相关目录
+│   ├── mcp_testing.py             # MCP测试实现
+│   ├── test_config.py             # 配置测试
+│   ├── test_config_loader.py      # 配置加载器测试
+│   └── test_mcp_logging.py        # MCP日志测试
+├── tests/                         # 测试目录
+│   ├── integration/               # 集成测试 (空)
+│   └── unit/                      # 单元测试 (空)
+├── tools/                         # 工具目录
+│   ├── __init__.py                # 初始化文件
+│   ├── __pycache__/
+│   ├── base.py                    # 基础实现
+│   ├── browser/                   # 浏览器工具 (空)
+│   ├── code/                      # 代码工具 (空)
+│   ├── file/                      # 文件工具 (空)
+│   ├── file_tools.py              # 文件工具实现
+│   ├── mcp_ai_tools.py            # MCP AI工具
+│   ├── mcp_file_tools.py          # MCP文件工具
+│   ├── mcp_tools.py               # MCP工具集
+│   └── search/                    # 搜索工具 (空)
+├── ui/                            # 用户界面目录
+│   ├── __init__.py                # 初始化文件
+│   ├── __pycache__/
+│   ├── cli.py                     # 命令行界面
+│   ├── vscode/                    # VS Code相关 (空)
+│   └── web/                       # Web界面 (空)
+├── utils/                         # 工具类目录
+│   ├── __init__.py                # 初始化文件
+│   ├── __pycache__/
+│   ├── ai_response_processor.py   # AI响应处理器
+│   ├── file_manager.py            # 文件管理器
+│   └── logger.py                  # 日志工具
+└── 项目目录.txt                     # 项目目录描述文件
