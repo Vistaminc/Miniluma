@@ -114,27 +114,54 @@ async def run_mcp_assistant(provider, model, thinking):
         # 欢迎信息
         print(f"\n{assistant.name} 已准备就绪。输入'exit'或'quit'退出。")
         print("特殊命令:")
-        #print("- 'save': 保存当前对话到文件")
-        print("- 'm <对话ID>': 恢复指定记忆/历史记录")
-        print("- 'ai <内容>': 向特定AI模型请求回答")
+        print("- '-chat': 进入聊天模式（默认保存所有生成的文件）")
+        print("- '-m <对话ID>': 恢复指定记忆/历史记录")
+        print("- '-ai <内容>': 向特定AI模型请求回答")
+        #print("- '-save': 保存当前对话生成的文件")
         print("-" * 50)
+        
+        # 默认模式标识
+        chat_mode = False
         
         # 交互循环
         while True:
             # 获取用户输入
-            user_input = input("用户: ").strip()
+            prompt = "聊天模式" if chat_mode else "用户"
+            user_input = input(f"{prompt}: ").strip()
             
             # 检查退出命令
             if user_input.lower() in ['exit', 'quit', 'q']:
+                # 结束会话并保存状态
+                await assistant.end_session()
                 print("再见！")
                 break
                 
-            # 处理用户输入
-            response = await assistant.process(user_input)
-            print(f"\n{assistant.name}: {response}\n")
+            # 检查模式切换命令
+            if user_input.lower() == '-chat':
+                chat_mode = not chat_mode
+                mode_status = "已进入聊天模式" if chat_mode else "已退出聊天模式"
+                print(f"\n{mode_status}（{'默认保存所有生成的文件' if chat_mode else '仅手动保存生成的文件'}）\n")
+                continue
+                
+            # 在聊天模式下，自动添加-save前缀
+            if chat_mode and not user_input.startswith('-'):
+                # 处理用户输入
+                response = await assistant.process(user_input)
+                print(f"\n{assistant.name}: {response}\n")
+                
+                # 自动保存生成的文件
+                save_result = await assistant._save_generated_files(None)
+                if "成功保存" in save_result:
+                    print(f"[系统] {save_result}\n")
+            else:
+                # 正常处理用户输入
+                response = await assistant.process(user_input)
+                print(f"\n{assistant.name}: {response}\n")
             
     except KeyboardInterrupt:
         print("\n程序已终止")
+        # 保存状态
+        await assistant.end_session()
     except Exception as e:
         print(f"错误: {str(e)}")
         import traceback

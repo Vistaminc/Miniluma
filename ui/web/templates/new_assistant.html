@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}MiniLuma - 创建新助手{% endblock %}
+
+{% block content %}
+<div class="container create-assistant-container">
+    <div class="form-card">
+        <h2>创建新助手</h2>
+        <form id="createAssistantForm">
+            <div class="form-group">
+                <label for="assistantName">助手名称</label>
+                <input type="text" id="assistantName" name="name" placeholder="MiniLuma" value="MiniLuma" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="providerName">LLM提供商</label>
+                <select id="providerName" name="provider_name">
+                    <option value="deepseek" selected>DeepSeek</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic</option>
+                    <option value="gemini">Gemini</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="modelName">模型</label>
+                <select id="modelName" name="model">
+                    <option value="deepseek-chat" selected>DeepSeek Chat</option>
+                    <option value="gpt-4">GPT-4</option>
+                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                    <option value="claude-3-opus">Claude 3 Opus</option>
+                    <option value="gemini-pro">Gemini Pro</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="systemPrompt">系统提示词 (可选)</label>
+                <textarea id="systemPrompt" name="system_prompt" rows="4" placeholder="设置助手的行为和能力..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="conversationId">恢复对话ID (可选)</label>
+                <input type="text" id="conversationId" name="conversation_id" placeholder="输入对话ID以恢复会话">
+                <p class="form-hint">如需恢复之前的对话，请输入对话ID</p>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary" id="createAssistantBtn">
+                    <i class="fas fa-robot"></i> 创建助手
+                </button>
+            </div>
+        </form>
+        
+        <div id="createAssistantError" class="error-message" style="display: none;"></div>
+        <div id="createAssistantLoading" class="loading-indicator" style="display: none;">
+            <i class="fas fa-spinner fa-spin"></i> 创建中...
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('createAssistantForm');
+    const errorDiv = document.getElementById('createAssistantError');
+    const loadingDiv = document.getElementById('createAssistantLoading');
+    
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        // 隐藏错误信息，显示加载指示器
+        errorDiv.style.display = 'none';
+        loadingDiv.style.display = 'block';
+        
+        // 收集表单数据
+        const formData = {
+            name: document.getElementById('assistantName').value,
+            provider_name: document.getElementById('providerName').value,
+            model: document.getElementById('modelName').value,
+            system_prompt: document.getElementById('systemPrompt').value,
+            conversation_id: document.getElementById('conversationId').value
+        };
+        
+        // 如果对话ID为空，设置为null
+        if (!formData.conversation_id) {
+            formData.conversation_id = null;
+        }
+        
+        try {
+            // 发送创建助手请求
+            const response = await fetch('/api/assistants', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+            
+            if (!response.ok) {
+                throw new Error('创建助手失败: ' + (await response.text()));
+            }
+            
+            const data = await response.json();
+            
+            // 创建成功，重定向到聊天界面
+            window.location.href = `/chat?assistant_id=${data.assistant_id}`;
+        } catch (error) {
+            // 显示错误信息
+            errorDiv.textContent = error.message;
+            errorDiv.style.display = 'block';
+            loadingDiv.style.display = 'none';
+        }
+    });
+    
+    // 根据选择的提供商更新模型选项
+    document.getElementById('providerName').addEventListener('change', function() {
+        const provider = this.value;
+        const modelSelect = document.getElementById('modelName');
+        
+        // 清空现有选项
+        modelSelect.innerHTML = '';
+        
+        // 根据提供商添加相应的模型选项
+        switch(provider) {
+            case 'deepseek':
+                addOption(modelSelect, 'deepseek-chat', 'DeepSeek Chat');
+                break;
+            case 'openai':
+                addOption(modelSelect, 'gpt-4', 'GPT-4');
+                addOption(modelSelect, 'gpt-3.5-turbo', 'GPT-3.5 Turbo');
+                break;
+            case 'anthropic':
+                addOption(modelSelect, 'claude-3-opus', 'Claude 3 Opus');
+                addOption(modelSelect, 'claude-3-sonnet', 'Claude 3 Sonnet');
+                break;
+            case 'gemini':
+                addOption(modelSelect, 'gemini-pro', 'Gemini Pro');
+                break;
+        }
+    });
+    
+    // 添加选项的辅助函数
+    function addOption(selectElement, value, text) {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = text;
+        selectElement.appendChild(option);
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,684 @@
+{% extends "base.html" %}
+
+{% block title %}MiniLuma - 对话 | {{ assistant_name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/chat.css') }}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="chat-container">
+    <div class="chat-sidebar">
+        <div class="assistant-info">
+            <div class="assistant-avatar">
+                <i class="fas fa-robot"></i>
+            </div>
+            <div class="assistant-details">
+                <h3 id="assistantName">{{ assistant_name }}</h3>
+                <p class="assistant-id" id="assistantId">ID: {{ assistant_id }}</p>
+                <p class="assistant-status" id="conversationStatus">
+                    <span class="status-indicator active"></span> 会话进行中
+                </p>
+            </div>
+        </div>
+        
+        <!-- 新增：智能体状态显示区域 -->
+        <div class="sidebar-section ai-status-section">
+            <div class="section-header">
+                <h4><i class="fas fa-brain"></i> 智能体状态</h4>
+            </div>
+            <div id="aiStatusContainer" class="ai-status-container">
+                <div class="ai-status-idle">
+                    <span class="ai-status-icon"><i class="fas fa-circle"></i></span>
+                    <span class="ai-status-text">AI智能体空闲</span>
+                </div>
+                <!-- 智能体工作状态和进度条会在这里动态显示 -->
+            </div>
+        </div>
+        
+        <div class="sidebar-section">
+            <div class="section-header">
+                <h4><i class="fas fa-file-alt"></i> 生成的文件</h4>
+                <button id="refreshFilesBtn" class="btn btn-icon" title="刷新文件列表">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+            </div>
+            <div id="filesContainer" class="files-list">
+                <p class="empty-state-text">尚无生成的文件</p>
+            </div>
+        </div>
+        
+        <div class="sidebar-actions">
+            <button id="saveFilesBtn" class="btn btn-secondary">
+                <i class="fas fa-save"></i> 保存文件
+            </button>
+            <button id="endSessionBtn" class="btn btn-danger">
+                <i class="fas fa-power-off"></i> 结束会话
+            </button>
+        </div>
+    </div>
+    
+    <div class="chat-main">
+        <div id="messagesContainer" class="messages-container">
+            <div class="welcome-message">
+                <h2>欢迎使用 {{ assistant_name }}</h2>
+                <p>您可以开始提问或描述您需要帮助的任务。助手将尽力提供帮助。</p>
+            </div>
+        </div>
+        
+        <div class="chat-input-container">
+            <form id="messageForm">
+                <div class="input-wrapper">
+                    <textarea 
+                        id="messageInput" 
+                        placeholder="输入您的问题或描述您的任务..." 
+                        rows="1"
+                        autofocus
+                    ></textarea>
+                    <button type="submit" class="btn btn-primary send-btn">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 确认对话框模板 -->
+<div id="confirmDialog" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="confirmTitle">确认操作</h3>
+            <span class="close-btn">&times;</span>
+        </div>
+        <div class="modal-body">
+            <p id="confirmMessage">确定要执行此操作吗？</p>
+        </div>
+        <div class="modal-footer">
+            <button id="cancelBtn" class="btn btn-secondary">取消</button>
+            <button id="confirmBtn" class="btn btn-danger">确认</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化变量
+    const assistantId = "{{ assistant_id }}";
+    const messagesContainer = document.getElementById('messagesContainer');
+    const messageForm = document.getElementById('messageForm');
+    const messageInput = document.getElementById('messageInput');
+    const filesContainer = document.getElementById('filesContainer');
+    const refreshFilesBtn = document.getElementById('refreshFilesBtn');
+    const saveFilesBtn = document.getElementById('saveFilesBtn');
+    const endSessionBtn = document.getElementById('endSessionBtn');
+    const aiStatusContainer = document.getElementById('aiStatusContainer');
+    
+    // 智能体状态轮询
+    let statusPollingInterval = null;
+    let isProcessing = false;
+    
+    // 确认对话框相关元素
+    const confirmDialog = document.getElementById('confirmDialog');
+    const confirmTitle = document.getElementById('confirmTitle');
+    const confirmMessage = document.getElementById('confirmMessage');
+    const confirmBtn = document.getElementById('confirmBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const closeBtn = document.querySelector('.close-btn');
+    
+    // 配置markdown渲染器
+    marked.setOptions({
+        highlight: function(code, lang) {
+            if (lang && hljs.getLanguage(lang)) {
+                return hljs.highlight(code, { language: lang }).value;
+            }
+            return hljs.highlightAuto(code).value;
+        },
+        breaks: true,
+        gfm: true
+    });
+    
+    // 自动调整文本域高度
+    messageInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight) + 'px';
+    });
+    
+    // 提交消息表单
+    messageForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const messageText = messageInput.value.trim();
+        if (!messageText) return;
+        
+        // 添加用户消息到界面
+        addMessage('user', messageText);
+        
+        // 清空输入框并重置高度
+        messageInput.value = '';
+        messageInput.style.height = 'auto';
+        
+        // 显示加载指示器
+        addLoadingMessage();
+        
+        // 开始轮询智能体状态
+        startStatusPolling();
+        
+        try {
+            // 发送消息到服务器
+            const response = await fetch(`/api/assistants/${assistantId}/messages`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: messageText,
+                    add_to_memory: true
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error('发送消息失败');
+            }
+            
+            const data = await response.json();
+            
+            // 停止轮询智能体状态
+            stopStatusPolling();
+            
+            // 移除加载指示器
+            removeLoadingMessage();
+            
+            // 添加助手回复到界面
+            addMessage('assistant', data.message);
+            
+            // 如果有生成的文件，刷新文件列表
+            if (data.saved_files && data.saved_files.length > 0) {
+                refreshFilesList();
+            }
+            
+            // 滚动到底部
+            scrollToBottom();
+        } catch (error) {
+            // 停止轮询智能体状态
+            stopStatusPolling();
+            
+            // 移除加载指示器
+            removeLoadingMessage();
+            
+            // 显示错误消息
+            addErrorMessage(error.message);
+        }
+    });
+    
+    // 刷新文件列表
+    refreshFilesBtn.addEventListener('click', refreshFilesList);
+    
+    // 保存文件
+    saveFilesBtn.addEventListener('click', async function() {
+        try {
+            const response = await fetch(`/api/assistants/${assistantId}/save-files`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ assistant_id: assistantId })
+            });
+            
+            if (!response.ok) {
+                throw new Error('保存文件失败');
+            }
+            
+            const data = await response.json();
+            
+            // 显示成功消息
+            addSystemMessage(data.message);
+            
+            // 刷新文件列表
+            refreshFilesList();
+        } catch (error) {
+            addErrorMessage(`保存文件失败: ${error.message}`);
+        }
+    });
+    
+    // 结束会话
+    endSessionBtn.addEventListener('click', function() {
+        // 显示确认对话框
+        showConfirmDialog(
+            '结束会话',
+            '确定要结束当前会话吗？这将保存所有状态并清除活跃会话。',
+            endSession
+        );
+    });
+    
+    // 结束会话的实际处理函数
+    async function endSession() {
+        try {
+            const response = await fetch(`/api/assistants/${assistantId}/end-session`, {
+                method: 'POST'
+            });
+            
+            if (!response.ok) {
+                throw new Error('结束会话失败');
+            }
+            
+            const data = await response.json();
+            
+            // 更新会话状态指示器
+            document.getElementById('conversationStatus').innerHTML = 
+                '<span class="status-indicator inactive"></span> 会话已结束';
+            
+            // 显示成功消息
+            addSystemMessage('会话已结束，所有状态已保存');
+            
+            // 禁用输入框和按钮
+            messageInput.disabled = true;
+            endSessionBtn.disabled = true;
+            document.querySelector('.send-btn').disabled = true;
+            
+            // 5秒后重定向到主页
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 5000);
+        } catch (error) {
+            addErrorMessage(`结束会话失败: ${error.message}`);
+        }
+    }
+    
+    // 显示确认对话框
+    function showConfirmDialog(title, message, confirmCallback) {
+        confirmTitle.textContent = title;
+        confirmMessage.textContent = message;
+        
+        // 设置确认按钮回调
+        confirmBtn.onclick = function() {
+            closeConfirmDialog();
+            confirmCallback();
+        };
+        
+        // 显示对话框
+        confirmDialog.style.display = 'block';
+    }
+    
+    // 关闭确认对话框
+    function closeConfirmDialog() {
+        confirmDialog.style.display = 'none';
+    }
+    
+    // 取消按钮和关闭按钮的事件处理
+    cancelBtn.onclick = closeConfirmDialog;
+    closeBtn.onclick = closeConfirmDialog;
+    
+    // 点击对话框外部关闭对话框
+    window.onclick = function(event) {
+        if (event.target === confirmDialog) {
+            closeConfirmDialog();
+        }
+    };
+    
+    // 添加消息到界面
+    function addMessage(type, content) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${type}-message`;
+        
+        const avatarDiv = document.createElement('div');
+        avatarDiv.className = 'message-avatar';
+        
+        if (type === 'user') {
+            avatarDiv.innerHTML = '<i class="fas fa-user"></i>';
+        } else {
+            avatarDiv.innerHTML = '<i class="fas fa-robot"></i>';
+        }
+        
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+        
+        // 使用marked渲染markdown内容
+        contentDiv.innerHTML = marked.parse(content);
+        
+        // 应用代码高亮
+        contentDiv.querySelectorAll('pre code').forEach((block) => {
+            hljs.highlightElement(block);
+        });
+        
+        messageDiv.appendChild(avatarDiv);
+        messageDiv.appendChild(contentDiv);
+        messagesContainer.appendChild(messageDiv);
+        
+        // 滚动到底部
+        scrollToBottom();
+    }
+    
+    // 添加系统消息
+    function addSystemMessage(content) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message system-message';
+        messageDiv.innerHTML = `<div class="system-message-content"><i class="fas fa-info-circle"></i> ${content}</div>`;
+        messagesContainer.appendChild(messageDiv);
+        
+        // 滚动到底部
+        scrollToBottom();
+    }
+    
+    // 添加错误消息
+    function addErrorMessage(content) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message error-message';
+        messageDiv.innerHTML = `<div class="error-message-content"><i class="fas fa-exclamation-triangle"></i> ${content}</div>`;
+        messagesContainer.appendChild(messageDiv);
+        
+        // 滚动到底部
+        scrollToBottom();
+    }
+    
+    // 添加加载指示器
+    function addLoadingMessage() {
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = 'message assistant-message loading-message';
+        loadingDiv.id = 'loadingMessage';
+        
+        const avatarDiv = document.createElement('div');
+        avatarDiv.className = 'message-avatar';
+        avatarDiv.innerHTML = '<i class="fas fa-robot"></i>';
+        
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+        contentDiv.innerHTML = '<div class="typing-indicator"><span></span><span></span><span></span></div>';
+        
+        loadingDiv.appendChild(avatarDiv);
+        loadingDiv.appendChild(contentDiv);
+        messagesContainer.appendChild(loadingDiv);
+        
+        // 滚动到底部
+        scrollToBottom();
+    }
+    
+    // 移除加载指示器
+    function removeLoadingMessage() {
+        const loadingMessage = document.getElementById('loadingMessage');
+        if (loadingMessage) {
+            loadingMessage.remove();
+        }
+    }
+    
+    // 刷新文件列表
+    async function refreshFilesList() {
+        try {
+            const response = await fetch(`/api/assistants/${assistantId}/files`);
+            
+            if (!response.ok) {
+                throw new Error('获取文件列表失败');
+            }
+            
+            const data = await response.json();
+            
+            // 更新文件列表UI
+            updateFilesListUI(data.files);
+        } catch (error) {
+            console.error('刷新文件列表失败:', error);
+        }
+    }
+    
+    // 更新文件列表UI
+    function updateFilesListUI(files) {
+        // 清空现有内容
+        filesContainer.innerHTML = '';
+        
+        if (!files || Object.keys(files).length === 0) {
+            filesContainer.innerHTML = '<p class="empty-state-text">尚无生成的文件</p>';
+            return;
+        }
+        
+        // 创建文件列表
+        const filesList = document.createElement('ul');
+        filesList.className = 'files-items';
+        
+        for (const [originalPath, savedPath] of Object.entries(files)) {
+            const fileName = savedPath.split('/').pop();
+            const fileExtension = fileName.split('.').pop();
+            
+            const fileItem = document.createElement('li');
+            fileItem.className = 'file-item';
+            
+            // 根据文件扩展名设置图标
+            let fileIcon = 'fa-file';
+            if (['js', 'ts', 'jsx', 'tsx'].includes(fileExtension)) fileIcon = 'fa-file-code';
+            else if (['py'].includes(fileExtension)) fileIcon = 'fa-file-code';
+            else if (['html', 'htm'].includes(fileExtension)) fileIcon = 'fa-file-code';
+            else if (['css', 'scss', 'sass'].includes(fileExtension)) fileIcon = 'fa-file-code';
+            else if (['md', 'txt'].includes(fileExtension)) fileIcon = 'fa-file-alt';
+            else if (['jpg', 'jpeg', 'png', 'gif', 'svg'].includes(fileExtension)) fileIcon = 'fa-file-image';
+            
+            fileItem.innerHTML = `
+                <div class="file-icon"><i class="fas ${fileIcon}"></i></div>
+                <div class="file-details">
+                    <span class="file-name">${fileName}</span>
+                    <span class="file-path">${savedPath}</span>
+                </div>
+                <div class="file-actions">
+                    <a href="/api/download/${assistantId}/${fileName}" 
+                       class="btn btn-icon" 
+                       title="下载文件"
+                       download="${fileName}">
+                        <i class="fas fa-download"></i>
+                    </a>
+                </div>
+            `;
+            
+            filesList.appendChild(fileItem);
+        }
+        
+        filesContainer.appendChild(filesList);
+    }
+    
+    // 滚动到底部
+    function scrollToBottom() {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+    
+    // 初始加载文件列表
+    refreshFilesList();
+    
+    // 加载对话历史记录
+    loadConversationHistory();
+    
+    // 智能体状态轮询函数
+    function startStatusPolling() {
+        // 标记正在处理
+        isProcessing = true;
+        
+        // 立即更新一次状态
+        fetchAssistantStatus();
+        
+        // 每1秒轮询一次
+        statusPollingInterval = setInterval(fetchAssistantStatus, 1000);
+    }
+    
+    // 停止状态轮询
+    function stopStatusPolling() {
+        if (statusPollingInterval) {
+            clearInterval(statusPollingInterval);
+            statusPollingInterval = null;
+        }
+        
+        isProcessing = false;
+        
+        // 恢复为默认状态
+        updateAIStatusUI({
+            status: "idle",
+            current_operation: null,
+            operation_details: null,
+            progress: null
+        });
+    }
+    
+    // 获取助手当前状态
+    async function fetchAssistantStatus() {
+        try {
+            const response = await fetch(`/api/assistants/${assistantId}/status`);
+            if (!response.ok) {
+                throw new Error('获取状态失败');
+            }
+            
+            const statusData = await response.json();
+            
+            // 更新状态UI
+            updateAIStatusUI(statusData);
+            
+            // 如果状态变为idle且之前是processing，停止轮询
+            if (statusData.status === "idle" && isProcessing) {
+                isProcessing = false;
+                stopStatusPolling();
+            }
+        } catch (error) {
+            console.error('获取助手状态出错:', error);
+        }
+    }
+    
+    // 更新AI状态UI
+    function updateAIStatusUI(statusData) {
+        // 清空状态容器
+        aiStatusContainer.innerHTML = '';
+        
+        let statusElement;
+        
+        switch(statusData.status) {
+            case "thinking":
+            case "processing":
+                statusElement = document.createElement('div');
+                statusElement.className = 'ai-status-working';
+                
+                let iconEl = document.createElement('span');
+                iconEl.className = 'ai-status-icon';
+                iconEl.innerHTML = '<i class="fas fa-cog thinking-animation"></i>';
+                
+                let textEl = document.createElement('div');
+                textEl.className = 'ai-status-text-container';
+                
+                let titleEl = document.createElement('span');
+                titleEl.className = 'ai-status-text';
+                titleEl.textContent = statusData.current_operation || 'AI正在处理中...';
+                
+                textEl.appendChild(titleEl);
+                
+                // 如果有详细信息
+                if (statusData.operation_details) {
+                    let detailsEl = document.createElement('div');
+                    detailsEl.className = 'ai-status-details';
+                    detailsEl.textContent = statusData.operation_details;
+                    textEl.appendChild(detailsEl);
+                }
+                
+                statusElement.appendChild(iconEl);
+                statusElement.appendChild(textEl);
+                
+                // 如果有进度
+                if (statusData.progress) {
+                    let progressContainer = document.createElement('div');
+                    progressContainer.className = 'ai-status-progress-container';
+                    
+                    let progressBar = document.createElement('div');
+                    progressBar.className = 'ai-status-progress-bar';
+                    progressBar.style.width = `${statusData.progress}%`;
+                    
+                    progressContainer.appendChild(progressBar);
+                    statusElement.appendChild(progressContainer);
+                }
+                break;
+                
+            case "error":
+                statusElement = document.createElement('div');
+                statusElement.className = 'ai-status-error';
+                
+                let errorIconEl = document.createElement('span');
+                errorIconEl.className = 'ai-status-icon';
+                errorIconEl.innerHTML = '<i class="fas fa-exclamation-circle"></i>';
+                
+                let errorTextEl = document.createElement('div');
+                errorTextEl.className = 'ai-status-text-container';
+                
+                let errorTitleEl = document.createElement('span');
+                errorTitleEl.className = 'ai-status-text';
+                errorTitleEl.textContent = '处理出错';
+                
+                errorTextEl.appendChild(errorTitleEl);
+                
+                if (statusData.operation_details) {
+                    let errorDetailsEl = document.createElement('div');
+                    errorDetailsEl.className = 'ai-status-details';
+                    errorDetailsEl.textContent = statusData.operation_details;
+                    errorTextEl.appendChild(errorDetailsEl);
+                }
+                
+                statusElement.appendChild(errorIconEl);
+                statusElement.appendChild(errorTextEl);
+                break;
+                
+            case "idle":
+            default:
+                statusElement = document.createElement('div');
+                statusElement.className = 'ai-status-idle';
+                
+                let idleIconEl = document.createElement('span');
+                idleIconEl.className = 'ai-status-icon';
+                idleIconEl.innerHTML = '<i class="fas fa-circle"></i>';
+                
+                let idleTextEl = document.createElement('span');
+                idleTextEl.className = 'ai-status-text';
+                idleTextEl.textContent = 'AI智能体空闲';
+                
+                statusElement.appendChild(idleIconEl);
+                statusElement.appendChild(idleTextEl);
+                break;
+        }
+        
+        aiStatusContainer.appendChild(statusElement);
+    }
+    
+    // 获取并加载对话历史记录
+    function loadConversationHistory() {
+        fetch(`/api/assistants/${assistantId}/conversation-history`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.history && data.history.length > 0) {
+                    // 移除任何现有的空状态消息
+                    const emptyStateMsg = messagesContainer.querySelector('.empty-state-text');
+                    if (emptyStateMsg) {
+                        emptyStateMsg.remove();
+                    }
+                    
+                    // 遍历历史记录并添加到UI
+                    data.history.forEach(msg => {
+                        // 确保消息对象有type和content字段
+                        if (msg.type && msg.content) {
+                            // 只显示用户和助手的消息
+                            if (msg.type === 'user' || msg.type === 'assistant') {
+                                addMessage(msg.type, msg.content);
+                            }
+                        }
+                    });
+                    
+                    // 滚动到底部
+                    scrollToBottom();
+                    
+                    addSystemMessage("已恢复之前的对话历史记录");
+                }
+            })
+            .catch(error => {
+                console.error('获取对话历史时出错:', error);
+                // 不向用户显示此错误，静默失败，UI保持空白
+            });
+    }
+});
+</script>
+{% endblock %}

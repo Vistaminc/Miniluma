@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}MiniLuma - 智能助手系统{% endblock %}
+
+{% block content %}
+<div class="hero-section">
+    <div class="hero-content">
+        <h1>欢迎使用 <span class="highlight">Mini</span>Luma</h1>
+        <p class="hero-subtitle">专业级AI助手，为您提供强大的对话和文件生成能力</p>
+        <div class="hero-actions">
+            <a href="/new-assistant" class="btn btn-primary btn-large">
+                <i class="fas fa-robot"></i> 创建新助手
+            </a>
+        </div>
+    </div>
+    <div class="hero-image">
+        <img src="{{ url_for('static', filename='img/assistant-illustration.svg') }}" alt="AI助手">
+    </div>
+</div>
+
+<div class="features-section">
+    <h2 class="section-title">主要功能</h2>
+    <div class="features-grid">
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-comments"></i></div>
+            <h3>智能对话</h3>
+            <p>基于先进的语言模型，提供自然、连贯的对话体验，支持上下文记忆</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-file-code"></i></div>
+            <h3>代码生成</h3>
+            <p>生成高质量的代码，支持多种编程语言，帮助您快速实现想法</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-history"></i></div>
+            <h3>对话持久化</h3>
+            <p>对话内容自动保存，确保您随时可以恢复之前的对话，不丢失重要信息</p>
+        </div>
+        <div class="feature-card">
+            <div class="feature-icon"><i class="fas fa-file-download"></i></div>
+            <h3>文件管理</h3>
+            <p>生成的文件自动保存，采用结构化存储，方便查找和管理</p>
+        </div>
+    </div>
+</div>
+
+<div class="cta-section">
+    <div class="cta-content">
+        <h2>立即开始使用MiniLuma</h2>
+        <p>创建您的第一个AI助手，探索无限可能</p>
+        <a href="/new-assistant" class="btn btn-primary">开始使用</a>
+    </div>
+</div>
+{% endblock %}

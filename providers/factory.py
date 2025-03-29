@@ -75,7 +75,9 @@ async def create_provider(provider_name: str = None, model: str = None, **kwargs
             print(f"尝试导入 DeepSeek LLM...")
             from llm.deepseek import DeepSeekLLM
             print(f"成功导入 DeepSeek LLM，正在初始化，模型: {model}，API密钥: {api_key[:4]}...{api_key[-4:]}...")
-            provider = await DeepSeekLLM.async_init(model=model, api_key=api_key, **kwargs)
+            kwargs["model"] = model
+            kwargs["api_key"] = api_key
+            provider = await DeepSeekLLM.async_init(**kwargs)
             print(f"成功创建 DeepSeek LLM 提供商实例")
             return provider
         except ImportError as e:

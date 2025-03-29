@@ -7,6 +7,8 @@ import sys
 import json
 import asyncio
 import datetime
+import uuid
+import requests
 from typing import Dict, List, Any, Optional, Union
 import logging
 import inspect
@@ -15,6 +17,10 @@ import re
 import shutil
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# 配置全局logger
+logger = logging.getLogger("MCPEnhancedAssistant")
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 from core.mcp import MCPMessage
 from core.mcp_agent import MCPAgent
@@ -50,6 +56,18 @@ class MCPEnhancedAssistant:
         self.auto_save_interval = 300  # 默认自动保存间隔(秒)
         self.auto_saved_files = {}  # 已自动保存的文件映射 {原始路径: 保存路径}
         
+        # 初始化状态跟踪
+        self.assistant_id = str(uuid.uuid4())
+        self.current_status = {
+            "assistant_id": self.assistant_id,
+            "status": "idle",
+            "current_operation": None,
+            "operation_details": None,
+            "progress": None,
+            "timestamp": datetime.datetime.now().isoformat()
+        }
+        self.api_base_url = "http://localhost:8000"  # API服务器地址
+        
         # 项目根目录 (用于文件保存)
         # 获取脚本所在目录的上一级目录，即项目根目录
         self.project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -62,123 +80,48 @@ class MCPEnhancedAssistant:
         self.logger = ConversationLogger()
         # 获取日志文件路径
         self.log_file = self.logger.create_log_file()
-        # 获取对话记忆ID
-        self.conversation_id = self.logger.get_conversation_id()
+        # 获取对话记忆ID (直接访问属性而不是调用方法)
+        self.conversation_id = self.logger.conversation_id
         
-        # 配置模块级日志
-        global logger
-        logger = logging.getLogger("MCP助手")
-        logger.setLevel(logging.INFO)
-        
-        # 添加文件处理器
-        file_handler = logging.FileHandler(self.log_file, encoding='utf-8')
-        file_handler.setLevel(logging.INFO)
-        
-        # 添加控制台处理器
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
-        
-        # 设置日志格式
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        file_handler.setFormatter(formatter)
-        console_handler.setFormatter(formatter)
-        
-        # 添加处理器到日志记录器
-        logger.addHandler(file_handler)
-        logger.addHandler(console_handler)
-        
-        # 记录初始化信息
-        logger.info(f"对话记忆ID: {self.conversation_id}")
-    
-    @classmethod
-    async def create(cls, 
-                    name: str = "增强版助手",
-                    provider_name: str = None,
-                    model: str = None,
-                    system_prompt: Optional[str] = None,
-                    memory_path: Optional[str] = None,
-                    enable_multimodal: bool = True,
-                    enable_auto_save: bool = True):
-        """异步工厂方法，创建并初始化增强版助手实例
+    def update_status(self, status: str, operation: Optional[str] = None, 
+                     details: Optional[str] = None, progress: Optional[float] = None) -> None:
+        """更新助手当前的状态
         
         Args:
-            name: 助手名称
-            provider_name: LLM提供商名称
-            model: 模型名称
-            system_prompt: 系统提示
-            memory_path: 记忆数据库路径
-            enable_multimodal: 是否启用多模态处理
-            enable_auto_save: 是否启用自动保存功能
-            
-        Returns:
-            初始化好的助手实例
+            status: 状态类型 (idle, thinking, processing, error)
+            operation: 当前操作的简短描述
+            details: 操作的详细信息
+            progress: 进度百分比（0-100）
         """
-        instance = cls(name)
+        self.current_status.update({
+            "status": status,
+            "current_operation": operation,
+            "operation_details": details,
+            "progress": progress,
+            "timestamp": datetime.datetime.now().isoformat()
+        })
         
-        # 记录模型信息
-        instance.provider_name = provider_name
-        instance.model = model
+        # 记录到日志
+        if hasattr(self, 'logger') and self.logger:
+            if operation:
+                self.logger.log_system_event("状态更新", f"状态: {status} - {operation}")
+            else:
+                self.logger.log_system_event("状态更新", f"状态: {status}")
         
-        # 设置自动保存状态
-        instance.auto_save_enabled = enable_auto_save
-        
-        # 获取配置
-        config = Config()
-        
-        # 获取默认提供商和模型
-        if not provider_name:
-            provider_name = config.get_default_provider()
-        if not model:
-            model = config.get_default_model(provider_name)
-            
-        # 异步创建LLM服务
-        logger.info(f"正在创建LLM服务，提供商: {provider_name}，模型: {model}")
-        llm_service = await create_provider(provider_name, model)
-        
-        # 初始化 MCP 代理
-        instance.agent = MCPAgent(
-            name=name,
-            llm_service=llm_service,
-            system_prompt=system_prompt
-        )
-        
-        # 注册所有工具
-        for tool in get_all_mcp_tools():
-            instance.agent.toolkit.register_tool(tool)
-        
-        # 初始化记忆系统
-        if memory_path:
-            instance.memory = SqliteMemory(name=name, db_path=memory_path)
-        else:
-            instance.memory = SqliteMemory(name=name)
-        
-        # 初始化反馈系统
-        instance.feedback = MCPFeedback()
-        
-        # 初始化多模态处理（如果启用）
-        if enable_multimodal:
-            instance.multimodal = MCPMultimodal()
-        else:
-            instance.multimodal = None
-        
-        # 初始化插件管理器
-        instance.plugin_manager = PluginManager()
-        
-        # 注册默认插件并初始化
-        instance.plugin_manager.initialize_plugins(instance.agent)
-        
-        # 会话历史
-        instance.conversation_history = []
-        
-        # 最后一条消息的响应
-        instance.last_response = None
-        
-        logger.info(f"MCP助手 '{name}' 初始化完成")
-        return instance
+        # 尝试将状态更新发送到API服务器
+        try:
+            api_url = f"{self.api_base_url}/assistants/{self.assistant_id}/status"
+            requests.post(
+                api_url,
+                json=self.current_status,
+                timeout=1  # 短超时，避免阻塞
+            )
+        except Exception as e:
+            # 忽略API通信错误，不影响主要流程
+            if hasattr(self, 'logger') and self.logger:
+                self.logger.log_system_event("错误", f"状态更新通信失败: {str(e)}")
     
-    async def process(self, 
-                     user_input: str, 
-                     add_to_memory: bool = True,
+    async def process(self, user_input: str, add_to_memory: bool = True,
                      memory_metadata: Optional[Dict[str, Any]] = None) -> str:
         """处理用户输入并生成回复
         
@@ -194,7 +137,7 @@ class MCPEnhancedAssistant:
             return "请输入内容"
         
         # 记录用户消息
-        logger.info(f"用户输入: {user_input}")
+        self.logger.log_system_event("用户输入", f"{user_input}")
         
         # 同时记录到标准会话日志
         self.logger.log("user", user_input)
@@ -207,7 +150,7 @@ class MCPEnhancedAssistant:
         memory_pattern = re.compile(r'^-m([a-zA-Z0-9_-]+)$')
         memory_match = memory_pattern.match(user_input.strip())
         if memory_match:
-            logger.info("检测到恢复记忆请求")
+            self.logger.log_system_event("记忆", "检测到恢复记忆请求")
             memory_id = memory_match.group(1)
             return await self._restore_from_memory(memory_id)
         
@@ -215,7 +158,7 @@ class MCPEnhancedAssistant:
         save_pattern = re.compile(r'^-save(\s+.+)?$')
         save_match = save_pattern.match(user_input.strip())
         if save_match:
-            logger.info("检测到保存生成文件请求")
+            self.logger.log_system_event("文件", "检测到保存生成文件请求")
             file_path = save_match.group(1).strip() if save_match.group(1) else None
             return await self._save_generated_files(file_path)
             
@@ -223,13 +166,13 @@ class MCPEnhancedAssistant:
         auto_save_pattern = re.compile(r'^-autosave\s+(on|off|interval\s+\d+)$')
         auto_save_match = auto_save_pattern.match(user_input.strip())
         if auto_save_match:
-            logger.info("检测到自动保存设置请求")
+            self.logger.log_system_event("配置", "检测到自动保存设置请求")
             setting = auto_save_match.group(1)
             return self._configure_auto_save(setting)
         
         # 检查是否是对话保存请求
         if self._is_save_request(user_input):
-            logger.info("检测到对话保存请求")
+            self.logger.log_system_event("对话", "检测到对话保存请求")
             file_path = self._save_conversation()
             self.last_response = f"已将对话保存到文件：{file_path}"
             
@@ -239,7 +182,7 @@ class MCPEnhancedAssistant:
             
             # 添加到日志
             self.logger.log("assistant", self.last_response, agent=self.name)
-            logger.info(f"系统响应: {self.last_response}")
+            self.logger.log_system_event("响应", f"{self.last_response}")
             
             # 添加到记忆系统
             if add_to_memory:
@@ -248,19 +191,24 @@ class MCPEnhancedAssistant:
                         content=user_input + " -> " + self.last_response,
                         metadata=memory_metadata or {"type": "file_save"}
                     )
-                    logger.info(f"会话已添加到记忆系统，ID: {memory_id}")
+                    self.logger.log_system_event("记忆", f"会话已添加到记忆系统，ID: {memory_id}")
                 except Exception as e:
-                    logger.error(f"记忆保存失败: {str(e)}")
+                    self.logger.log_system_event("错误", f"记忆保存失败: {str(e)}")
             
             return self.last_response
         
+        # 检查是否是结束会话请求
+        if self._is_end_request(user_input):
+            self.logger.log_system_event("会话", "检测到结束会话请求")
+            return await self.end_session()
+            
         # 检查是否是 AI 对话请求
         if self._is_ai_request(user_input):
-            logger.info("检测到AI对话请求")
+            self.logger.log_system_event("AI对话", "检测到AI对话请求")
             try:
                 # 提取 AI 对话内容
                 ai_content = self._extract_ai_content(user_input)
-                logger.info(f"提取的AI对话内容: {ai_content}")
+                self.logger.log_system_event("AI对话", f"提取的AI对话内容: {ai_content}")
                 
                 # 使用提供商生成回复
                 provider_response = await self.provider.generate(
@@ -269,7 +217,7 @@ class MCPEnhancedAssistant:
                 )
                 
                 # 记录原始响应
-                logger.info(f"AI提供商原始响应: {provider_response}")
+                self.logger.log_system_event("AI响应", f"AI提供商原始响应: {provider_response[:100]}...")
                 
                 # 提取回复内容
                 if isinstance(provider_response, dict):
@@ -278,13 +226,13 @@ class MCPEnhancedAssistant:
                     elif "content" in provider_response:
                         self.last_response = provider_response["content"]
                     else:
-                        logger.warning(f"agent.process返回格式异常: {provider_response}")
+                        self.logger.log_system_event("警告", f"agent.process返回格式异常: {provider_response}")
                         self.last_response = "处理请求时出错，响应格式不正确"
                 else:
                     self.last_response = str(provider_response)
             except Exception as e:
                 self.last_response = f"向 AI 模型请求时出错: {str(e)}"
-                logger.error(f"向 AI 模型请求时出错: {str(e)}")
+                self.logger.log_system_event("错误", f"向 AI 模型请求时出错: {str(e)}")
             
             # 添加助手消息到历史
             assistant_message = MCPMessage("assistant", self.last_response)
@@ -292,7 +240,7 @@ class MCPEnhancedAssistant:
             
             # 添加到日志
             self.logger.log("assistant", self.last_response, agent=self.name)
-            logger.info(f"系统响应: {self.last_response}")
+            self.logger.log_system_event("响应", f"系统响应: {self.last_response[:100]}...")
             
             # 添加到记忆系统
             if add_to_memory:
@@ -301,15 +249,15 @@ class MCPEnhancedAssistant:
                         content=user_input + " -> " + self.last_response,
                         metadata=memory_metadata or {"type": "ai_dialog"}
                     )
-                    logger.info(f"会话已添加到记忆系统，ID: {memory_id}")
+                    self.logger.log_system_event("记忆", f"会话已添加到记忆系统，ID: {memory_id}")
                 except Exception as e:
-                    logger.error(f"记忆保存失败: {str(e)}")
+                    self.logger.log_system_event("错误", f"记忆保存失败: {str(e)}")
             
             return self.last_response
         
         # 正常处理用户输入
         try:
-            logger.info("使用MCP Agent处理请求")
+            self.logger.log_system_event("处理", "使用MCP Agent处理请求")
             
             # 记录处理开始
             start_time = time.time()
@@ -319,7 +267,7 @@ class MCPEnhancedAssistant:
             
             # 记录处理时间
             processing_time = time.time() - start_time
-            logger.info(f"MCP处理耗时: {processing_time:.2f}秒")
+            self.logger.log_system_event("处理", f"MCP处理耗时: {processing_time:.2f}秒")
             
             # 存储可能生成的文件路径
             generated_files = []
@@ -335,7 +283,7 @@ class MCPEnhancedAssistant:
             # 记录工具使用情况
             if isinstance(result, dict) and "tools" in result:
                 tool_info = result["tools"]
-                logger.info(f"使用的工具: {tool_info}")
+                self.logger.log_system_event("工具", f"使用的工具: {tool_info}")
                 
                 # 添加工具使用记录到对话历史
                 for tool in tool_info:
@@ -361,7 +309,7 @@ class MCPEnhancedAssistant:
                     # 在实际API中，不同的LLM可能会使用不同的工具名称格式
                     write_file_tools = ['write_to_file', 'write_file', 'writeToFile', 'WriteFile', 'writeFile', 'write-file', 'write-to-file']
                     if any(name.lower() in tool_name.lower() for name in write_file_tools):
-                        logger.info(f"检测到文件写入工具: {tool_name}")
+                        self.logger.log_system_event("文件", f"检测到文件写入工具: {tool_name}")
                         # 尝试不同的参数名称格式
                         file_path = None
                         for param_name in ['path', 'file_path', 'filepath', 'file', 'filename', 'target_file', 'targetFile', 'TargetFile']:
@@ -370,7 +318,7 @@ class MCPEnhancedAssistant:
                                 break
                         
                         if file_path:
-                            logger.info(f"从工具参数中提取的文件路径: {file_path}")
+                            self.logger.log_system_event("文件", f"从工具参数中提取的文件路径: {file_path}")
                             # 保存文件路径用于稍后处理
                             generated_files.append(file_path)
                             # 添加到待保存文件列表
@@ -383,7 +331,7 @@ class MCPEnhancedAssistant:
             # 记录终端输出
             if isinstance(result, dict) and "terminal_output" in result:
                 terminal_output = result["terminal_output"]
-                logger.info(f"终端输出: {terminal_output}")
+                self.logger.log_system_event("终端", f"终端输出: {terminal_output}")
                 
                 # 添加终端输出到对话历史
                 terminal_message = MCPMessage(
@@ -405,12 +353,12 @@ class MCPEnhancedAssistant:
                 elif "content" in result:
                     response = result["content"]
                 else:
-                    logger.warning(f"agent.process返回格式异常: {result}")
+                    self.logger.log_system_event("警告", f"agent.process返回格式异常: {result}")
                     response = "处理请求时出错，响应格式不正确"
             else:
                 response = str(result)
                 
-            logger.info(f"处理结果: {response}")
+            self.logger.log_system_event("处理", f"处理结果: {response}")
             
             # 记录响应
             self.last_response = response
@@ -427,7 +375,7 @@ class MCPEnhancedAssistant:
             for file_path, mod_time in files_after.items():
                 if file_path not in files_before or mod_time > files_before.get(file_path, 0):
                     new_or_modified_files.append(file_path)
-                    logger.info(f"检测到新增或修改的文件: {file_path}")
+                    self.logger.log_system_event("文件", f"检测到新增或修改的文件: {file_path}")
             
             # 保存新增或修改的文件
             saved_files = []
@@ -451,7 +399,7 @@ class MCPEnhancedAssistant:
                 self.last_response += file_info
                 
                 # 记录到日志
-                logger.info(f"已自动保存 {len(saved_files)} 个文件")
+                self.logger.log_system_event("文件", f"已自动保存 {len(saved_files)} 个文件")
             
             # 移动项目目录下的文件到结果目录
             moved_files = await self._move_files_to_results_directory()
@@ -469,7 +417,7 @@ class MCPEnhancedAssistant:
                     self.conversation_history[-1].content = self.last_response
                 
                 # 记录到日志
-                logger.info(f"已移动 {len(moved_files)} 个文件")
+                self.logger.log_system_event("文件", f"已移动 {len(moved_files)} 个文件")
             
             # 添加助手消息到历史
             assistant_message = MCPMessage("assistant", self.last_response)
@@ -477,7 +425,7 @@ class MCPEnhancedAssistant:
             
             # 添加到日志
             self.logger.log("assistant", self.last_response, agent=self.name)
-            logger.info(f"系统响应: {self.last_response}")
+            self.logger.log_system_event("响应", f"系统响应: {self.last_response}")
             
             # 添加到记忆系统
             if add_to_memory:
@@ -505,9 +453,9 @@ class MCPEnhancedAssistant:
                         content=user_input + " -> " + response,
                         metadata=memory_metadata
                     )
-                    logger.info(f"会话已添加到记忆系统，ID: {memory_id}")
+                    self.logger.log_system_event("记忆", f"会话已添加到记忆系统，ID: {memory_id}")
                 except Exception as e:
-                    logger.error(f"记忆保存失败: {str(e)}")
+                    self.logger.log_system_event("错误", f"记忆保存失败: {str(e)}")
             
             # 自动保存检测到的文件，立即执行，不等待时间间隔
             if self.auto_save_enabled and self.pending_files_to_save:
@@ -517,10 +465,10 @@ class MCPEnhancedAssistant:
             
         except Exception as e:
             error_msg = f"处理请求时出错: {str(e)}"
-            logger.error(error_msg)
+            self.logger.log_system_event("错误", error_msg)
             import traceback
             traceback_str = traceback.format_exc()
-            logger.error(f"异常堆栈: {traceback_str}")
+            self.logger.log_system_event("错误", f"异常堆栈: {traceback_str}")
             
             # 添加错误信息到对话历史
             error_message = MCPMessage(
@@ -530,10 +478,7 @@ class MCPEnhancedAssistant:
             self.conversation_history.append(error_message)
             
             # 记录到日志
-            self.logger.log_system_event(
-                "错误",
-                f"错误信息:\n```\n{traceback_str}\n```"
-            )
+            self.logger.log_system_event("错误", f"异常堆栈: {traceback_str}")
             
             self.last_response = error_msg
             return error_msg
@@ -575,16 +520,16 @@ class MCPEnhancedAssistant:
             # 创建时间目录
             results_dir = os.path.join(self.project_root, "results")
             os.makedirs(results_dir, exist_ok=True)
-            logger.info(f"创建结果目录: {results_dir}")
+            self.logger.log_system_event("文件", f"创建结果目录: {results_dir}")
             
             time_dir = os.path.join(results_dir, date_str)
             os.makedirs(time_dir, exist_ok=True)
-            logger.info(f"创建日期目录: {time_dir}")
+            self.logger.log_system_event("文件", f"创建日期目录: {time_dir}")
             
             # 创建对话ID目录
             conversation_dir = os.path.join(time_dir, conversation_id_short)
             os.makedirs(conversation_dir, exist_ok=True)
-            logger.info(f"创建对话ID目录: {conversation_dir}")
+            self.logger.log_system_event("文件", f"创建对话ID目录: {conversation_dir}")
             
             # 创建文件名 
             file_name = f"对话记录_{time_str}.md"
@@ -605,15 +550,15 @@ class MCPEnhancedAssistant:
             self.conversation_history.append(system_message)
             
             # 记录到日志
-            self.logger.log_system_event("对话保存", f"已保存对话记录到: {result}")
+            self.logger.log_system_event("对话", f"已保存对话记录到: {result}")
             
             return result
             
         except Exception as e:
             error_msg = f"保存对话时出错: {str(e)}"
-            logger.error(error_msg)
+            self.logger.log_system_event("错误", error_msg)
             import traceback
-            logger.error(f"异常堆栈: {traceback.format_exc()}")
+            self.logger.log_system_event("错误", f"异常堆栈: {traceback.format_exc()}")
             
             # 添加错误信息到对话历史
             error_message = MCPMessage("system", error_msg)
@@ -803,12 +748,12 @@ class MCPEnhancedAssistant:
             恢复结果信息
         """
         try:
-            logger.info(f"正在从记忆ID恢复对话: {memory_id}")
+            self.logger.log_system_event("记忆", f"正在从记忆ID恢复对话: {memory_id}")
             
             # 验证记忆ID格式
             if not memory_id or not isinstance(memory_id, str):
                 error_msg = "无效的记忆ID格式"
-                logger.error(error_msg)
+                self.logger.log_system_event("错误", error_msg)
                 return f"恢复对话失败: {error_msg}"
             
             # 尝试获取记忆内容
@@ -816,7 +761,7 @@ class MCPEnhancedAssistant:
             
             if not memory_item:
                 error_msg = f"找不到记忆ID: {memory_id}"
-                logger.error(error_msg)
+                self.logger.log_system_event("错误", error_msg)
                 return f"恢复对话失败: {error_msg}"
             
             # 从记忆中提取对话内容
@@ -824,8 +769,8 @@ class MCPEnhancedAssistant:
             memory_metadata = memory_item.get('metadata', {})
             
             # 记录到日志
-            logger.info(f"已找到记忆: {memory_id}")
-            logger.info(f"记忆元数据: {memory_metadata}")
+            self.logger.log_system_event("记忆", f"已找到记忆: {memory_id}")
+            self.logger.log_system_event("记忆", f"记忆元数据: {memory_metadata}")
             
             # 如果记忆中包含完整对话历史
             if 'conversation_history' in memory_metadata:
@@ -846,7 +791,7 @@ class MCPEnhancedAssistant:
                         msg = MCPMessage(msg_type, msg_content, name=msg_name)
                         self.conversation_history.append(msg)
                     
-                    logger.info(f"已恢复{len(self.conversation_history)}条对话消息")
+                    self.logger.log_system_event("记忆", f"已恢复{len(self.conversation_history)}条对话消息")
                     
                     # 构建恢复摘要
                     summary = f"已从记忆 {memory_id} 恢复对话，共{len(self.conversation_history)}条消息。"
@@ -856,13 +801,13 @@ class MCPEnhancedAssistant:
                     self.conversation_history.append(restore_msg)
                     
                     # 记录到日志
-                    self.logger.log_system_event("对话恢复", f"已从记忆ID {memory_id} 恢复对话历史")
+                    self.logger.log_system_event("对话", f"已从记忆ID {memory_id} 恢复对话历史")
                     
                     return summary
                 except Exception as e:
-                    logger.error(f"解析对话历史数据时出错: {str(e)}")
+                    self.logger.log_system_event("错误", f"解析对话历史数据时出错: {str(e)}")
                     import traceback
-                    logger.error(traceback.format_exc())
+                    self.logger.log_system_event("错误", traceback.format_exc())
                     return f"恢复对话历史时出错: {str(e)}"
             
             # 如果记忆中没有完整对话历史，只有简单内容
@@ -871,15 +816,15 @@ class MCPEnhancedAssistant:
             self.conversation_history.append(system_msg)
             
             # 记录到日志
-            self.logger.log_system_event("对话恢复部分成功", f"记忆ID {memory_id} 中没有完整对话历史")
+            self.logger.log_system_event("对话", f"记忆ID {memory_id} 中没有完整对话历史")
             
             return f"已尝试从记忆ID {memory_id} 恢复，但只找到部分内容。\n记忆内容: {memory_content[:100]}..."
             
         except Exception as e:
             error_msg = f"从记忆恢复对话时出错: {str(e)}"
-            logger.error(error_msg)
+            self.logger.log_system_event("错误", error_msg)
             import traceback
-            logger.error(f"异常堆栈: {traceback.format_exc()}")
+            self.logger.log_system_event("错误", f"异常堆栈: {traceback.format_exc()}")
             
             # 添加错误信息到对话历史
             error_message = MCPMessage("system", f"恢复记忆出错: {str(e)}")
@@ -890,349 +835,61 @@ class MCPEnhancedAssistant:
             
             return f"恢复对话失败: {str(e)}"
 
-    async def _move_files_to_results_directory(self) -> List[str]:
-        """将项目目录下的文件移动到结果目录中
-        
-        将项目目录中的文件移动到 /results/日期/年份日期+时间_对话id后4位/ 结构下
-        仅移动项目根目录下的文件，不处理子目录
-        
-        Returns:
-            移动的文件路径列表
-        """
-        try:
-            logger.info("开始移动项目目录下的文件到结果目录")
-            
-            # 准备保存目录结构: /results/日期/年份日期+时间_对话ID后4位/
-            now = datetime.datetime.now()
-            date_str = now.strftime("%Y%m%d")
-            time_str = now.strftime("%H%M%S")
-            year_str = now.strftime("%Y")
-            
-            # 使用对话ID的后4位作为目录名的一部分
-            conversation_id_suffix = self.conversation_id[-4:] if len(self.conversation_id) >= 4 else self.conversation_id
-            dir_name = f"{year_str}{date_str}+{time_str}_{conversation_id_suffix}"
-            
-            # 创建结果目录 (在项目根目录下)
-            results_dir = os.path.join(self.project_root, "results")
-            os.makedirs(results_dir, exist_ok=True)
-            logger.info(f"创建结果目录: {results_dir}")
-            
-            time_dir = os.path.join(results_dir, date_str)
-            os.makedirs(time_dir, exist_ok=True)
-            logger.info(f"创建日期目录: {time_dir}")
-            
-            # 创建对话ID目录
-            conversation_dir = os.path.join(time_dir, dir_name)
-            os.makedirs(conversation_dir, exist_ok=True)
-            logger.info(f"创建时间及对话ID目录: {conversation_dir}")
-            
-            # 读取忽略文件列表
-            ignore_files = []
-            ignored_files_path = os.path.join(self.project_root, "data", "ignored_files.txt")
-            if os.path.exists(ignored_files_path):
-                try:
-                    with open(ignored_files_path, 'r', encoding='utf-8') as f:
-                        for line in f:
-                            line = line.strip()
-                            # 跳过空行和注释
-                            if not line or line.startswith('#'):
-                                continue
-                            ignore_files.append(line)
-                    logger.info(f"从配置文件加载了 {len(ignore_files)} 个忽略文件模式")
-                except Exception as e:
-                    logger.error(f"读取忽略文件列表时出错: {str(e)}")
-                    # 使用默认值
-                    ignore_files = ['LICENSE', 'README', 'requirements.txt', 'setup.py', 'config.json', '.env']
-            else:
-                # 如果配置文件不存在，使用默认值
-                ignore_files = ['LICENSE', 'README', 'requirements.txt', 'setup.py', 'config.json', '.env']
-                logger.warning(f"忽略文件配置不存在: {ignored_files_path}，使用默认值")
-            
-            # 获取项目根目录中的文件列表，并筛选出非系统文件
-            moved_files = []
-            ignore_dirs = ['.git', '__pycache__', 'logs', 'results', 'utils', 'examples', 'data']
-            ignore_extensions = ['.py', '.md', '.gitignore', '.txt']
-            
-            for item in os.listdir(self.project_root):
-                item_path = os.path.join(self.project_root, item)
-                
-                # 只处理文件，忽略目录
-                if os.path.isdir(item_path):
-                    continue
-                    
-                # 忽略指定的目录中的文件
-                if any(item.startswith(prefix) for prefix in ignore_dirs):
-                    continue
-                    
-                # 忽略指定扩展名的文件
-                if any(item.endswith(ext) for ext in ignore_extensions):
-                    continue
-                
-                # 检查是否应该忽略此文件
-                should_ignore = False
-                for pattern in ignore_files:
-                    # 简单的通配符匹配
-                    if pattern.endswith('*'):
-                        if item.startswith(pattern[:-1]):
-                            should_ignore = True
-                            break
-                    elif pattern.startswith('*'):
-                        if item.endswith(pattern[1:]):
-                            should_ignore = True
-                            break
-                    elif pattern == item:
-                        should_ignore = True
-                        break
-                
-                if should_ignore:
-                    logger.info(f"忽略文件: {item} (匹配忽略模式)")
-                    continue
-                    
-                # 移动文件到结果目录
-                dest_path = os.path.join(conversation_dir, item)
-                
-                try:
-                    # 复制文件到目标位置
-                    shutil.copy2(item_path, dest_path)
-                    logger.info(f"已复制文件: {item_path} -> {dest_path}")
-                    
-                    # 删除原文件
-                    os.remove(item_path)
-                    logger.info(f"已删除原文件: {item_path}")
-                    
-                    moved_files.append(dest_path)
-                except Exception as e:
-                    logger.error(f"移动文件时出错: {item_path} -> {dest_path}, 错误: {str(e)}")
-            
-            # 生成移动结果消息
-            if moved_files:
-                moved_files_rel = [os.path.relpath(f, self.project_root) for f in moved_files]
-                message = f"已移动 {len(moved_files)} 个文件到 {os.path.relpath(conversation_dir, self.project_root)}:\n"
-                for idx, file_path in enumerate(moved_files_rel):
-                    message += f"{idx+1}. {file_path}\n"
-                
-                # 添加系统消息到对话历史
-                system_message = MCPMessage("system", message)
-                self.conversation_history.append(system_message)
-                
-                # 记录到日志
-                self.logger.log_system_event("文件移动", message)
-                
-                return moved_files
-            else:
-                logger.info("没有找到需要移动的文件")
-                return []
-                
-        except Exception as e:
-            logger.error(f"移动文件到结果目录时出错: {str(e)}")
-            import traceback
-            logger.error(f"异常堆栈: {traceback.format_exc()}")
-            return []
-            
-    async def _auto_save_generated_file(self, file_path: str) -> Optional[str]:
-        """自动保存生成的文件到存档目录
+    async def _tool_callback(self, tool_name: str, tool_input: Dict[str, Any], tool_output: Any) -> None:
+        """工具调用回调函数
         
         Args:
-            file_path: 文件路径
-            
-        Returns:
-            保存的文件路径，如果失败则返回None
+            tool_name: 工具名称
+            tool_input: 工具输入参数
+            tool_output: 工具输出结果
         """
-        if not file_path or not os.path.exists(file_path):
-            logger.warning(f"文件不存在，无法保存: {file_path}")
-            return None
-            
         try:
-            # 准备保存目录结构: /results/日期/年份日期+时间_对话ID后4位/
-            now = datetime.datetime.now()
-            date_str = now.strftime("%Y%m%d")
-            time_str = now.strftime("%H%M%S")
-            year_str = now.strftime("%Y")
+            # 更新状态为正在使用工具
+            tool_description = self._get_tool_friendly_name(tool_name)
+            self.update_status(
+                "processing", 
+                f"正在使用: {tool_description}", 
+                f"处理中...",
+                60
+            )
             
-            # 使用对话ID的后4位作为目录名的一部分
-            conversation_id_suffix = self.conversation_id[-4:] if len(self.conversation_id) >= 4 else self.conversation_id
-            dir_name = f"{year_str}{date_str}+{time_str}_{conversation_id_suffix}"
+            # 将工具调用记录到日志
+            input_str = json.dumps(tool_input, ensure_ascii=False)
+            self.logger.log_system_event("工具", f"{tool_name}, 输入: {input_str[:100]}...")
             
-            # 创建结果目录 (在项目根目录下)
-            results_dir = os.path.join(self.project_root, "results")
-            os.makedirs(results_dir, exist_ok=True)
-            logger.info(f"创建结果目录: {results_dir}")
-            
-            time_dir = os.path.join(results_dir, date_str)
-            os.makedirs(time_dir, exist_ok=True)
-            logger.info(f"创建日期目录: {time_dir}")
-            
-            # 创建对话ID目录
-            conversation_dir = os.path.join(time_dir, dir_name)
-            os.makedirs(conversation_dir, exist_ok=True)
-            logger.info(f"创建年份日期时间对话ID目录: {conversation_dir}")
-            
-            # 创建文件管理器
-            from utils.file_manager import FileManager
-            file_manager = FileManager()
-            
-            # 获取文件名
-            file_name = os.path.basename(file_path)
-            dest_file = os.path.join(conversation_dir, file_name)
-            
-            # 复制文件到目标位置
-            dest_file = file_manager.copy_file_to_path(file_path, dest_file)
-            logger.info(f"已自动保存文件: {file_path} -> {dest_file}")
-            
-            # 记录已保存的文件
-            self.auto_saved_files[file_path] = dest_file
-            
-            # 记录到日志
-            self.logger.log_system_event("文件保存", f"已自动保存文件: {file_path} -> {dest_file}")
-            
-            return dest_file
-            
+            # 文件操作检测
+            if tool_name in ["write_file", "append_to_file", "create_file"] and "path" in tool_input:
+                self.pending_files_to_save.append(tool_input["path"])
+                self.logger.log_system_event("文件", f"添加待保存文件: {tool_input['path']}")
         except Exception as e:
-            logger.error(f"自动保存文件时出错: {file_path}, {str(e)}")
-            return None
-            
-    async def _auto_detect_and_save_files_from_response(self, response: str) -> List[str]:
-        """自动检测和保存从响应中提取的代码文件
+            self.logger.log_system_event("错误", f"工具回调处理错误: {str(e)}")
+    
+    def _get_tool_friendly_name(self, tool_name: str) -> str:
+        """获取工具的友好显示名称
         
         Args:
-            response: AI响应内容
+            tool_name: 工具内部名称
             
         Returns:
-            保存的文件路径列表
+            用户友好的工具名称
         """
-        try:
-            # 从响应中提取代码块和文件名
-            code_blocks = []
-            in_code_block = False
-            current_block = []
-            current_lang = ""
-            
-            # 提取可能的文件名(引号中包含点和字母的内容)
-            file_names = re.findall(r'[\'"`]([a-zA-Z0-9_\-]+\.[a-zA-Z0-9]+)[\'"`]', response)
-            logger.info(f"从引号中提取的文件名: {file_names}")
-            
-            # 提取代码块
-            lines = response.split('\n')
-            for line in lines:
-                if line.strip().startswith('```'):
-                    if in_code_block:
-                        # 结束代码块
-                        in_code_block = False
-                        code_blocks.append({
-                            'lang': current_lang,
-                            'code': '\n'.join(current_block)
-                        })
-                        current_block = []
-                        current_lang = ""
-                    else:
-                        # 开始代码块
-                        in_code_block = True
-                        # 尝试提取语言
-                        lang_match = re.match(r'```(\w+)', line)
-                        if lang_match:
-                            current_lang = lang_match.group(1)
-                elif in_code_block:
-                    current_block.append(line)
-            
-            # 如果有未关闭的代码块，添加到列表
-            if in_code_block and current_block:
-                code_blocks.append({
-                    'lang': current_lang,
-                    'code': '\n'.join(current_block)
-                })
-            
-            # 保存提取的代码块
-            saved_files = []
-            
-            # 准备保存目录结构: /results/日期/年份日期+时间_对话ID后4位/
-            now = datetime.datetime.now()
-            date_str = now.strftime("%Y%m%d")
-            time_str = now.strftime("%H%M%S")
-            year_str = now.strftime("%Y")
-            
-            # 使用对话ID的后4位作为目录名的一部分
-            conversation_id_suffix = self.conversation_id[-4:] if len(self.conversation_id) >= 4 else self.conversation_id
-            dir_name = f"{year_str}{date_str}+{time_str}_{conversation_id_suffix}"
-            
-            # 创建结果目录 (在项目根目录下)
-            results_dir = os.path.join(self.project_root, "results")
-            os.makedirs(results_dir, exist_ok=True)
-            logger.info(f"创建结果目录: {results_dir}")
-            
-            time_dir = os.path.join(results_dir, date_str)
-            os.makedirs(time_dir, exist_ok=True)
-            logger.info(f"创建日期目录: {time_dir}")
-            
-            # 创建对话ID目录
-            conversation_dir = os.path.join(time_dir, dir_name)
-            os.makedirs(conversation_dir, exist_ok=True)
-            logger.info(f"创建年份日期时间对话ID目录: {conversation_dir}")
-            
-            # 创建文件管理器
-            from utils.file_manager import FileManager
-            file_manager = FileManager()
-            
-            # 保存代码块
-            for i, block in enumerate(code_blocks):
-                lang = block['lang'].lower()
-                code = block['code']
-                
-                # 根据语言确定文件扩展名
-                ext = '.txt'  # 默认
-                if lang in ['python', 'py']:
-                    ext = '.py'
-                elif lang in ['javascript', 'js']:
-                    ext = '.js'
-                elif lang in ['html']:
-                    ext = '.html'
-                elif lang in ['css']:
-                    ext = '.css'
-                elif lang in ['json']:
-                    ext = '.json'
-                elif lang in ['markdown', 'md']:
-                    ext = '.md'
-                
-                # 尝试从文件名列表匹配扩展名
-                matched_name = None
-                for name in file_names:
-                    if name.endswith(ext):
-                        matched_name = name
-                        # 从列表中移除已使用的文件名
-                        file_names.remove(name)
-                        break
-                
-                # 如果没有匹配到，生成一个默认名
-                if not matched_name:
-                    matched_name = f"代码块_{i+1}{ext}"
-                
-                # 保存文件
-                file_path = os.path.join(conversation_dir, matched_name)
-                saved_file = file_manager.save_file_to_path(code, file_path)
-                saved_files.append(saved_file)
-                logger.info(f"已保存代码块到: {saved_file}")
-            
-            # 系统消息
-            if saved_files:
-                saved_files_rel = [os.path.relpath(f, self.project_root) for f in saved_files]
-                message = f"已自动保存 {len(saved_files)} 个代码文件到 {os.path.relpath(conversation_dir, self.project_root)}:\n"
-                for idx, file_path in enumerate(saved_files_rel):
-                    message += f"{idx+1}. {file_path}\n"
-                
-                # 添加系统消息到对话历史
-                system_message = MCPMessage("system", message)
-                self.conversation_history.append(system_message)
-                
-                # 记录到日志
-                self.logger.log_system_event("代码文件保存", message)
-            
-            return saved_files
-            
-        except Exception as e:
-            logger.error(f"自动检测和保存文件时出错: {str(e)}")
-            import traceback
-            logger.error(f"异常堆栈: {traceback.format_exc()}")
-            return []
-            
+        # 工具名称映射表
+        tool_names = {
+            "web_search": "搜索网络",
+            "write_file": "写入文件",
+            "read_file": "读取文件",
+            "append_to_file": "追加到文件",
+            "create_file": "创建文件",
+            "list_directory": "列出目录",
+            "python_repl": "执行Python代码",
+            "shell": "执行命令",
+            "image_generator": "生成图像",
+            "image_analyzer": "分析图像",
+            "db_query": "查询数据库"
+        }
+        
+        return tool_names.get(tool_name, tool_name)
+    
     async def _initialize(self):
         """异步初始化方法，完成各种组件的初始化"""
         # 设置日志文件
@@ -1259,9 +916,9 @@ class MCPEnhancedAssistant:
             with open(self.conversation_id_file, 'w', encoding='utf-8') as f:
                 f.write(self.conversation_id)
                 
-            logger.info(f"已保存对话ID: {self.conversation_id}")
+            self.logger.log_system_event("会话", f"已保存对话ID: {self.conversation_id}")
         except Exception as e:
-            logger.error(f"保存对话ID时出错: {str(e)}")
+            self.logger.log_system_event("错误", f"保存对话ID时出错: {str(e)}")
             
     def _load_last_conversation_id(self) -> Optional[str]:
         """尝试加载上次的对话ID，用于对话连续性"""
@@ -1270,11 +927,14 @@ class MCPEnhancedAssistant:
                 with open(self.conversation_id_file, 'r', encoding='utf-8') as f:
                     conversation_id = f.read().strip()
                     if conversation_id:
-                        logger.info(f"已加载上次的对话ID: {conversation_id}")
+                        if hasattr(self, 'logger') and self.logger:
+                            self.logger.log_system_event("会话", f"已加载上次的对话ID: {conversation_id}")
+                        else:
+                            print(f"已加载上次的对话ID: {conversation_id}")
                         return conversation_id
         except Exception as e:
-            if logger:
-                logger.error(f"加载对话ID时出错: {str(e)}")
+            if hasattr(self, 'logger') and self.logger:
+                self.logger.log_system_event("错误", f"加载对话ID时出错: {str(e)}")
             else:
                 print(f"加载对话ID时出错: {str(e)}")
         
@@ -1285,7 +945,7 @@ class MCPEnhancedAssistant:
         if not self.auto_save_enabled or not self.pending_files_to_save:
             return
             
-        logger.info(f"执行自动保存，待保存文件数: {len(self.pending_files_to_save)}")
+        self.logger.log_system_event("文件", f"执行自动保存，待保存文件数: {len(self.pending_files_to_save)}")
         
         # 复制一份列表防止迭代过程中修改
         files_to_save = self.pending_files_to_save.copy()
@@ -1297,7 +957,7 @@ class MCPEnhancedAssistant:
         
         # 记录保存结果
         if saved_count > 0:
-            logger.info(f"自动保存完成，成功保存了 {saved_count} 个文件")
+            self.logger.log_system_event("文件", f"自动保存完成，成功保存了 {saved_count} 个文件")
             # 添加系统消息到对话历史
             system_message = MCPMessage(
                 "system", 
@@ -1306,7 +966,7 @@ class MCPEnhancedAssistant:
             self.conversation_history.append(system_message)
             
             # 添加到日志
-            self.logger.log_system_event("文件自动保存完成", f"成功保存了 {saved_count} 个文件")
+            self.logger.log_system_event("文件", f"成功保存了 {saved_count} 个文件")
             
     def _configure_auto_save(self, setting: str) -> str:
         """配置自动保存设置
@@ -1319,11 +979,11 @@ class MCPEnhancedAssistant:
         """
         if setting == "on":
             self.auto_save_enabled = True
-            logger.info("自动保存功能已启用")
+            self.logger.log_system_event("配置", "自动保存功能已启用")
             return "自动保存功能已启用"
         elif setting == "off":
             self.auto_save_enabled = False
-            logger.info("自动保存功能已禁用")
+            self.logger.log_system_event("配置", "自动保存功能已禁用")
             return "自动保存功能已禁用"
         elif setting.startswith("interval"):
             try:
@@ -1331,13 +991,325 @@ class MCPEnhancedAssistant:
                 if interval < 10:
                     return "自动保存间隔不能小于10秒"
                 self.auto_save_interval = interval
-                logger.info(f"自动保存间隔已设置为: {interval}秒")
+                self.logger.log_system_event("配置", f"自动保存间隔已设置为: {interval}秒")
                 return f"自动保存间隔已设置为: {interval}秒"
             except (IndexError, ValueError):
                 return "自动保存间隔设置错误，格式应为: -autosave interval 秒数"
         else:
             return "自动保存设置错误，可用命令: -autosave on/off/interval 秒数"
 
+    async def end_session(self) -> str:
+        """结束会话并保存必要的状态"""
+        # 保存对话日志
+        self.logger.save_complete_log()
+        
+        # 保存对话ID到文件，用于持久化
+        self.logger.save_conversation_id()
+        
+        # 记录会话结束信息
+        self.logger.log_system_event("会话", f"会话 {self.conversation_id} 已结束")
+        
+        # 其他可能需要的清理工作
+        # ...
+        
+        return "会话已结束，所有状态已保存"
+
+    def _is_end_request(self, user_input: str) -> bool:
+        """判断是否是结束会话请求"""
+        end_patterns = [
+            r'^-end$',
+            r'^-quit$',
+            r'^-exit$',
+            r'^结束会话$',
+            r'^结束对话$',
+            r'^退出$'
+        ]
+        
+        for pattern in end_patterns:
+            if re.match(pattern, user_input.strip(), re.IGNORECASE):
+                return True
+        
+        return False
+
+    @classmethod
+    async def create(cls, 
+                    name: str = "增强版助手",
+                    provider_name: str = None,
+                    model: str = None,
+                    system_prompt: Optional[str] = None,
+                    memory_path: Optional[str] = None,
+                    conversation_id: Optional[str] = None,
+                    api_key: Optional[str] = None,
+                    api_base: Optional[str] = None,
+                    enable_multimodal: bool = True,
+                    enable_auto_save: bool = True):
+        """异步工厂方法，创建并初始化增强版助手实例
+        
+        Args:
+            name: 助手名称
+            provider_name: LLM提供商名称
+            model: 模型名称
+            system_prompt: 系统提示
+            memory_path: 记忆数据库路径
+            conversation_id: 对话ID，用于恢复对话
+            api_key: API密钥
+            api_base: API基础URL
+            enable_multimodal: 是否启用多模态处理
+            enable_auto_save: 是否启用自动保存功能
+            
+        Returns:
+            初始化好的助手实例
+        """
+        instance = cls(name)
+        
+        # 记录模型信息
+        instance.provider_name = provider_name
+        instance.model = model
+        
+        # 设置自动保存状态
+        instance.auto_save_enabled = enable_auto_save
+        
+        # 获取配置
+        config = Config()
+        
+        # 获取默认提供商和模型
+        if not provider_name:
+            provider_name = config.get_default_provider()
+        if not model:
+            model = config.get_default_model(provider_name)
+            
+        # 记录初始化信息
+        if hasattr(instance, 'logger') and instance.logger:
+            instance.logger.log_system_event("初始化", f"正在创建LLM服务，提供商: {provider_name}，模型: {model}")
+        
+        # 异步创建LLM服务
+        llm_service = await create_provider(provider_name, model, api_key=api_key, api_base=api_base)
+        
+        # 初始化 MCP 代理
+        instance.agent = MCPAgent(
+            name=name,
+            llm_service=llm_service,
+            system_prompt=system_prompt
+        )
+        
+        # 注册所有工具
+        for tool in get_all_mcp_tools():
+            instance.agent.toolkit.register_tool(tool)
+        
+        # 初始化记忆系统
+        if memory_path:
+            instance.memory = SqliteMemory(name=name, db_path=memory_path)
+        else:
+            instance.memory = SqliteMemory(name=name)
+        
+        # 初始化反馈系统
+        instance.feedback = MCPFeedback()
+        
+        # 初始化多模态处理（如果启用）
+        if enable_multimodal:
+            instance.multimodal = MCPMultimodal()
+        else:
+            instance.multimodal = None
+        
+        # 初始化插件管理器
+        instance.plugin_manager = PluginManager()
+        
+        # 注册默认插件并初始化
+        instance.plugin_manager.initialize_plugins(instance.agent)
+        
+        # 如果提供了对话ID，尝试恢复对话
+        if conversation_id:
+            try:
+                await instance._restore_from_memory(conversation_id)
+                if hasattr(instance, 'logger') and instance.logger:
+                    instance.logger.log_system_event("恢复对话", f"从记忆ID恢复对话: {conversation_id}")
+            except Exception as e:
+                if hasattr(instance, 'logger') and instance.logger:
+                    instance.logger.log_system_event("错误", f"恢复对话失败: {str(e)}")
+        
+        # 更新状态为空闲
+        instance.update_status("idle")
+        
+        if hasattr(instance, 'logger') and instance.logger:
+            instance.logger.log_system_event("初始化完成", f"MCP助手 '{name}' 初始化完成")
+        
+        return instance
+
+    async def _auto_detect_and_save_files_from_response(self, response: str) -> List[str]:
+        """从响应中自动检测代码块并保存为文件
+        
+        Args:
+            response: 助手回复内容
+            
+        Returns:
+            保存的文件路径列表
+        """
+        if not response:
+            return []
+            
+        self.logger.log_system_event("文件", "正在从响应中检测代码块")
+        
+        # 保存的文件路径列表
+        saved_files = []
+        
+        # 正则表达式匹配代码块
+        # 匹配以```开头，可能跟着语言名称，然后是任意内容，最后以```结尾的代码块
+        code_block_pattern = r"```([a-zA-Z0-9_+-]*)\n(.*?)\n```"
+        code_blocks = re.findall(code_block_pattern, response, re.DOTALL)
+        
+        if not code_blocks:
+            return []
+            
+        # 创建保存目录结构
+        date_str = datetime.datetime.now().strftime("%Y%m%d")
+        time_str = datetime.datetime.now().strftime("%H%M%S")
+        conversation_id_short = self.conversation_id[:8]
+        
+        # 结果目录路径
+        results_dir = os.path.join(self.project_root, "results")
+        date_dir = os.path.join(results_dir, date_str)
+        conversation_dir = os.path.join(date_dir, conversation_id_short)
+        
+        # 确保目录存在
+        os.makedirs(conversation_dir, exist_ok=True)
+        
+        # 处理每个代码块
+        for i, (language, code_content) in enumerate(code_blocks):
+            if not code_content.strip():
+                continue
+                
+            # 从代码内容中判断可能的文件名
+            file_name = None
+            
+            # 检查第一行是否包含文件名
+            first_line = code_content.strip().split('\n')[0].strip()
+            if first_line.startswith("// ") or first_line.startswith("# "):
+                # 如果第一行是注释，检查是否包含文件名
+                comment = first_line[3:].strip()
+                if "." in comment and "/" not in comment and "\\" not in comment:
+                    file_name = comment
+                    # 移除文件名所在的注释行
+                    code_content = '\n'.join(code_content.strip().split('\n')[1:])
+            
+            # 如果没有找到文件名，根据语言和索引自动生成
+            if not file_name:
+                if language.lower() in ["python", "py"]:
+                    file_name = f"script_{i+1}.py"
+                elif language.lower() in ["javascript", "js"]:
+                    file_name = f"script_{i+1}.js"
+                elif language.lower() in ["typescript", "ts"]:
+                    file_name = f"script_{i+1}.ts"
+                elif language.lower() in ["html"]:
+                    file_name = f"page_{i+1}.html"
+                elif language.lower() in ["css"]:
+                    file_name = f"style_{i+1}.css"
+                elif language.lower() in ["json"]:
+                    file_name = f"data_{i+1}.json"
+                elif language.lower() in ["markdown", "md"]:
+                    file_name = f"document_{i+1}.md"
+                elif language.lower() in ["bash", "shell", "sh"]:
+                    file_name = f"script_{i+1}.sh"
+                elif language.lower() in ["java"]:
+                    file_name = f"Program_{i+1}.java"
+                elif language.lower() in ["c", "cpp", "c++"]:
+                    file_name = f"program_{i+1}.c" if language.lower() == "c" else f"program_{i+1}.cpp"
+                else:
+                    file_name = f"code_block_{i+1}.txt"
+            
+            # 构建文件保存路径
+            file_path = os.path.join(conversation_dir, file_name)
+            
+            try:
+                # 保存代码到文件
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(code_content)
+                
+                self.logger.log_system_event("文件", f"已保存代码块到文件: {file_path}")
+                saved_files.append(file_path)
+                
+                # 记录到自动保存文件映射
+                self.auto_saved_files[f"代码块 {i+1}"] = file_path
+                
+            except Exception as e:
+                self.logger.log_system_event("错误", f"保存代码块到文件时出错: {str(e)}")
+        
+        return saved_files
+
+    async def _move_files_to_results_directory(self) -> List[str]:
+        """将生成的文件移动到结果目录
+        
+        将当前目录下新创建的文件移动到结果目录中
+        
+        Returns:
+            移动的文件路径列表
+        """
+        moved_files = []
+        
+        # 创建保存目录结构
+        date_str = datetime.datetime.now().strftime("%Y%m%d")
+        conversation_id_short = self.conversation_id[:8]
+        
+        # 结果目录路径
+        results_dir = os.path.join(self.project_root, "results")
+        date_dir = os.path.join(results_dir, date_str)
+        conversation_dir = os.path.join(date_dir, conversation_id_short)
+        
+        # 确保目录存在
+        os.makedirs(conversation_dir, exist_ok=True)
+        
+        self.logger.log_system_event("文件", f"准备将生成的文件移动到结果目录: {conversation_dir}")
+        
+        # 从工作目录中查找新增的文件
+        current_dir = os.getcwd()
+        try:
+            # 获取当前目录下的所有文件
+            files = [f for f in os.listdir(current_dir) if os.path.isfile(os.path.join(current_dir, f))]
+            
+            # 过滤掉日志文件和临时文件
+            files = [f for f in files if not f.startswith('.') and not f.endswith('.log') and not f.endswith('.tmp')]
+            
+            # 仅移动特定后缀的文件，避免移动系统文件
+            allowed_extensions = ['.py', '.js', '.html', '.css', '.json', '.md', '.txt', '.sh', '.java', '.c', '.cpp', 
+                                 '.h', '.hpp', '.csv', '.xml', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.conf',
+                                 '.ipynb', '.sql', '.db', '.pdf', '.docx', '.xlsx', '.pptx', '.png', '.jpg', '.jpeg', '.gif']
+            
+            files = [f for f in files if any(f.lower().endswith(ext) for ext in allowed_extensions)]
+            
+            for file_name in files:
+                source_path = os.path.join(current_dir, file_name)
+                
+                # 检查文件是否是新创建的或近期修改的
+                # 这里使用一个简单的启发式方法 - 如果文件在最近10分钟内被修改，就认为是新创建的
+                file_mtime = os.path.getmtime(source_path)
+                if time.time() - file_mtime > 600:  # 10分钟 = 600秒
+                    continue
+                
+                # 构建目标路径
+                target_path = os.path.join(conversation_dir, file_name)
+                
+                try:
+                    # 如果目标文件已存在，先删除
+                    if os.path.exists(target_path):
+                        os.remove(target_path)
+                    
+                    # 移动文件
+                    shutil.copy2(source_path, target_path)
+                    # 复制成功后删除源文件
+                    os.remove(source_path)
+                    
+                    self.logger.log_system_event("文件", f"已移动文件: {file_name} 到 {target_path}")
+                    moved_files.append(target_path)
+                    
+                    # 记录到自动保存文件映射
+                    self.auto_saved_files[file_name] = target_path
+                    
+                except Exception as e:
+                    self.logger.log_system_event("错误", f"移动文件 {file_name} 时出错: {str(e)}")
+            
+        except Exception as e:
+            self.logger.log_system_event("错误", f"查找和移动文件时出错: {str(e)}")
+        
+        return moved_files
 
 class MCPMessage:
     """MCP通信消息类"""

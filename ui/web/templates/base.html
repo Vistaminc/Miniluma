@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}MiniLuma{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="app-logo">
+                <a href="/">
+                    <h1><span class="highlight">Mini</span>Luma</h1>
+                </a>
+            </div>
+            <nav class="app-nav">
+                <ul>
+                    <li><a href="/" class="nav-link"><i class="fas fa-home"></i> 首页</a></li>
+                    <li><a href="/new-assistant" class="nav-link"><i class="fas fa-plus-circle"></i> 新建助手</a></li>
+                    <li><a href="https://github.com/Vistaminc/Miniluma" target="_blank" class="nav-link"><i class="fab fa-github"></i> GitHub</a></li>
+                </ul>
+            </nav>
+        </header>
+
+        <main class="app-content">
+            {% block content %}{% endblock %}
+        </main>
+
+        <footer class="app-footer">
+            <div class="footer-content">
+                <p>&copy; 2025 MiniLuma. 基于AI驱动的智能助手系统。</p>
+            </div>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

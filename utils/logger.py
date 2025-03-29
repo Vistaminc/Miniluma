@@ -34,8 +34,53 @@ class ConversationLogger:
         self.log_file = None
         self.conversation_history = []
         
-        # 生成对话记忆ID
-        self.conversation_id = str(uuid.uuid4())
+        # 尝试加载上次的对话ID，如果不存在则生成新的
+        self.conversation_id = self._load_last_conversation_id()
+        if not self.conversation_id:
+            # 生成新的对话记忆ID
+            self.conversation_id = str(uuid.uuid4())
+            print(f"生成新的对话记忆ID: {self.conversation_id}")
+        else:
+            print(f"使用上次的对话记忆ID: {self.conversation_id}")
+            
+    def _load_last_conversation_id(self) -> Optional[str]:
+        """尝试从文件加载上次的对话ID"""
+        # 对话ID持久性文件路径
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        conversation_id_file = os.path.join(project_root, "data", "last_conversation_id.txt")
+        
+        # 确保data目录存在
+        os.makedirs(os.path.dirname(conversation_id_file), exist_ok=True)
+        
+        # 尝试读取文件
+        if os.path.exists(conversation_id_file):
+            try:
+                with open(conversation_id_file, 'r', encoding='utf-8') as f:
+                    conversation_id = f.read().strip()
+                    if conversation_id:
+                        print(f"已加载上次的对话ID: {conversation_id}")
+                        return conversation_id
+            except Exception as e:
+                print(f"加载对话ID时出错: {str(e)}")
+        
+        return None
+        
+    def save_conversation_id(self) -> None:
+        """保存当前对话ID到文件，用于持久化"""
+        # 对话ID持久性文件路径
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        conversation_id_file = os.path.join(project_root, "data", "last_conversation_id.txt")
+        
+        # 确保data目录存在
+        os.makedirs(os.path.dirname(conversation_id_file), exist_ok=True)
+        
+        # 保存到文件
+        try:
+            with open(conversation_id_file, 'w', encoding='utf-8') as f:
+                f.write(self.conversation_id)
+            print(f"已保存对话ID: {self.conversation_id}")
+        except Exception as e:
+            print(f"保存对话ID时出错: {str(e)}")
     
     def create_log_file(self) -> str:
         """创建新的日志文件。

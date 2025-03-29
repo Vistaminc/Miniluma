@@ -50,7 +50,6 @@ main_copy.py
 # 测试文件
 docs/
 tests/
-tools/
 testing/
 test_config_loader.py
 test_config.py
