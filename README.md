@@ -1,4 +1,5 @@
 # Miniluma
+
 ================
 
 Miniluma是一个强大的智能代理框架，支持多种LLM提供商（包括DeepSeek和OpenAI），能够通过工具增强、多代理协作和异步处理实现复杂任务的自动化处理。
@@ -8,94 +9,102 @@ Miniluma是一个强大的智能代理框架，支持多种LLM提供商（包括
 </p>
 
 ## 功能特点
+
 ------------
 
 ### 多语言支持
 
-*   支持中文和英文界面
-*   可扩展的语言配置系统
+* 支持中文和英文界面
+* 可扩展的语言配置系统
 
 ### 多模式支持
 
-*   简单助手模式：单代理与工具集成
-*   多代理系统：复杂任务分解与协作
-*   自定义模式：配置自己的代理参数
-*   MCP增强助手：支持文件保存和AI对话的高级助手
+* 简单助手模式：单代理与工具集成
+* 多代理系统：复杂任务分解与协作
+* 自定义模式：配置自己的代理参数
+* MCP增强助手：支持文件保存和AI对话的高级助手
 
 ### 多LLM提供商支持
 
-*   DeepSeek支持（R1和V3模型）
-*   OpenAI支持（GPT-3.5和GPT-4系列）
-*   Anthropic支持（Claude系列）
-*   可扩展的提供商架构
+* DeepSeek支持（R1和V3模型）
+* OpenAI支持（GPT-3.5和GPT-4系列）
+* Anthropic支持（Claude系列）
+* 可扩展的提供商架构
 
 ### Reactor模式实现
 
-*   理性-行动循环（Reason-Action Cycles）
-*   工具集成和工具调用
-*   自动推理和任务分解
+* 理性-行动循环（Reason-Action Cycles）
+* 工具集成和工具调用
+* 自动推理和任务分解
 
 ### 异步架构
 
-*   支持异步API调用
-*   高效处理多个并行任务
-*   非阻塞用户界面体验
+* 支持异步API调用
+* 高效处理多个并行任务
+* 非阻塞用户界面体验
 
 ### 强大的工具集
 
-*   网络搜索功能
-*   代码执行功能
-*   文件管理与保存
-*   多媒体处理工具
-*   文档处理与分析
-*   可自定义的工具扩展
+* 网络搜索功能
+* 代码执行功能
+* 文件管理与保存
+* 多媒体处理工具
+* 文档处理与分析
+* 可自定义的工具扩展
 
 ### 自动保存功能
 
-*   自动检测和保存生成的文件
-*   自定义文件保存策略
-*   结构化存档管理
+* 自动检测和保存生成的文件
+* 自定义文件保存策略
+* 结构化存档管理
 
 ## 系统架构
+
 -------------
 
 ### 核心组件
 
-*   **Core**
-    *   `reactor.py`：实现Reactor模式，处理思考-行动循环
-    *   `context.py`：管理会话上下文和历史记录
-    *   `planner.py`：任务规划和分解
-    *   `mcp_system.py`：MCP协议集成
+* **Core**
+  
+  * `reactor.py`：实现Reactor模式，处理思考-行动循环
+  * `context.py`：管理会话上下文和历史记录
+  * `planner.py`：任务规划和分解
+  * `mcp_system.py`：MCP协议集成
 
-*   **LLM集成**
-    *   `deepseek.py`：DeepSeek LLM集成
-    *   `openai_llm.py`：OpenAI LLM集成
-    *   `anthropic_llm.py`：Anthropic Claude集成
+* **LLM集成**
+  
+  * `deepseek.py`：DeepSeek LLM集成
+  * `openai_llm.py`：OpenAI LLM集成
+  * `anthropic_llm.py`：Anthropic Claude集成
 
-*   **提供商工厂**
-    *   `factory.py`：LLM提供商工厂
-    *   `assistant_factory.py`：助手创建工厂
+* **提供商工厂**
+  
+  * `factory.py`：LLM提供商工厂
+  * `assistant_factory.py`：助手创建工厂
 
-*   **示例与应用**
-    *   `simple_assistant.py`：简单助手实现
-    *   `multi_agent_example.py`：多代理系统示例
-    *   `mcp_enhanced_assistant.py`：高级MCP助手
+* **示例与应用**
+  
+  * `simple_assistant.py`：简单助手实现
+  * `multi_agent_example.py`：多代理系统示例
+  * `mcp_enhanced_assistant.py`：高级MCP助手
 
-*   **工具集**
-    *   `web_tools.py`：网络工具集合
-    *   `file_tools.py`：文件操作工具
-    *   `code_tools.py`：代码分析与执行
-    *   `data_tools.py`：数据处理工具
+* **工具集**
+  
+  * `web_tools.py`：网络工具集合
+  * `file_tools.py`：文件操作工具
+  * `code_tools.py`：代码分析与执行
+  * `data_tools.py`：数据处理工具
 
 ## 快速开始
+
 ------------
 
 ### 环境要求
 
-*   Python 3.8+
-*   支持Windows、macOS和Linux系统
-*   Node.js（用于MCP功能）
-*   Playwright（用于高级浏览器自动化）
+* Python 3.8+
+* 支持Windows、macOS和Linux系统
+* Node.js（用于MCP功能）
+* Playwright（用于高级浏览器自动化）
 
 ### 安装依赖
 
@@ -140,6 +149,7 @@ python miniluma/main_cn.py
 ```
 
 ## 使用模式
+
 -------------
 
 ### 1. 简单助手模式
@@ -176,10 +186,10 @@ python miniluma/main.py --mode 4
 
 可选参数：
 
-*   `--provider`：指定LLM提供商（默认：deepseek）
-*   `--model`：指定具体模型
-*   `--thinking`：显示代理思考过程
-*   `--lang`：指定界面语言（zh-CN或en-US）
+* `--provider`：指定LLM提供商（默认：deepseek）
+* `--model`：指定具体模型
+* `--thinking`：显示代理思考过程
+* `--lang`：指定界面语言（zh-CN或en-US）
 
 ## Web界面
 
@@ -192,11 +202,13 @@ MiniLuma提供了一个现代化的Web界面，方便用户通过浏览器进行
 ### 开启方式
 
 1. 确保已安装所有依赖：
+   
    ```bash
    pip install -r requirements.txt
    ```
 
 2. 启动Web服务器：
+   
    ```bash
    python start_web.py
    ```
@@ -210,15 +222,17 @@ MiniLuma提供了一个现代化的Web界面，方便用户通过浏览器进行
 ![界面3](src/界面3.png)
 
 ## 技术说明
+
 -------------
 
-*   基于Reactor模式（Reason-Action-Observe循环）
-*   微内核架构设计，支持插件扩展
-*   多代理系统采用任务规划和分配机制
-*   异步非阻塞设计，提高响应效率
-*   自动保存功能确保生成的文件安全存储
+* 基于Reactor模式（Reason-Action-Observe循环）
+* 微内核架构设计，支持插件扩展
+* 多代理系统采用任务规划和分配机制
+* 异步非阻塞设计，提高响应效率
+* 自动保存功能确保生成的文件安全存储
 
 ## 开发指南
+
 -------------
 
 ### 自定义代理开发
@@ -242,9 +256,9 @@ print(result["response"])
 
 ### 添加新工具
 
-1.  在相应的工具模块中定义工具函数
-2.  在工具函数上使用`@tool`装饰器（如适用）
-3.  在代理初始化中注册工具
+1. 在相应的工具模块中定义工具函数
+2. 在工具函数上使用`@tool`装饰器（如适用）
+3. 在代理初始化中注册工具
 
 ```python
 from core.tool import tool
@@ -253,10 +267,10 @@ from core.tool import tool
 async def search_web(query: str) -> str:
     """
     在网络上搜索信息
-    
+
     Args:
         query: 搜索查询
-        
+
     Returns:
         搜索结果
     """
@@ -266,9 +280,9 @@ async def search_web(query: str) -> str:
 
 ### 添加新的LLM提供商
 
-1.  创建新的提供商类实现
-2.  在`factory.py`中添加提供商工厂支持
-3.  更新配置文件结构
+1. 创建新的提供商类实现
+2. 在`factory.py`中添加提供商工厂支持
+3. 更新配置文件结构
 
 ```python
 from llm.base import BaseLLM
@@ -277,7 +291,7 @@ class NewProviderLLM(BaseLLM):
     def __init__(self, api_key=None, model=None):
         super().__init__(api_key, model)
         # 初始化逻辑
-        
+
     async def generate(self, prompt, **kwargs):
         # 生成逻辑
         return response
@@ -285,11 +299,12 @@ class NewProviderLLM(BaseLLM):
 
 ### 多语言支持开发
 
-1.  在`main.py`中的`LANG_CONFIG`字典中添加新语言
-2.  提供所有必需的文本键值对
-3.  更新语言选择菜单
+1. 在`main.py`中的`LANG_CONFIG`字典中添加新语言
+2. 提供所有必需的文本键值对
+3. 更新语言选择菜单
 
 ## 目录结构
+
 -------------
 
 ```
@@ -309,24 +324,27 @@ miniluma/
 ```
 
 ## 参考项目
+
 -------------
 
-*   OWL（Optimized Workforce Learning）
-*   CAMEL-AI框架
-*   MCP（Model Context Protocol）
+* OWL（Optimized Workforce Learning）
+* CAMEL-AI框架
+* MCP（Model Context Protocol）
 
 ## 贡献指南
+
 -------------
 
 欢迎提交问题报告、功能请求和代码贡献。请遵循以下步骤：
 
-1.  Fork项目
-2.  创建功能分支（`git checkout -b feature/amazing-feature`）
-3.  提交更改（`git commit -m 'Add some amazing feature'`）
-4.  推送到分支（`git push origin feature/amazing-feature`）
-5.  创建Pull Request
+1. Fork项目
+2. 创建功能分支（`git checkout -b feature/amazing-feature`）
+3. 提交更改（`git commit -m 'Add some amazing feature'`）
+4. 推送到分支（`git push origin feature/amazing-feature`）
+5. 创建Pull Request
 
 ## 许可证
+
 ------------
 
 [MIT License](LICENSE)
@@ -334,6 +352,7 @@ miniluma/
 ## 支持与赞赏
 
 如果您觉得MiniLuma对您有帮助，欢迎通过以下方式支持我们：
+
 - 您的赞助将用于帮助我们持续改进和完善 MiniLuma！
 
 <div style="display: flex; justify-content: space-between; max-width: 600px; margin: 0 auto;">
@@ -346,23 +365,29 @@ miniluma/
 </div>
 
 ## Sponsors & Supporters 【赞助商 & 支持者】
- - Qutanfang 5￥/CNY
- - 云中海 15￥/CNY
 
-    # 感谢以上人员/企业的支持！
+- Qutanfang 5￥/CNY
+
+- 云中海 15￥/CNY
+  
+  
+  
+   感谢以上人员/企业的支持！
 
 ## 后续开发计划
+
 -----------------
 
-*   增强多语言支持
-*   添加更多LLM提供商集成
-*   实现Web界面
-*   增强多代理协作能力
-*   优化记忆检索机制
-*   增加更多文档和图像处理工具
-*   支持流式响应
+* 增强多语言支持
+* 添加更多LLM提供商集成
+* 实现Web界面
+* 增强多代理协作能力
+* 优化记忆检索机制
+* 增加更多文档和图像处理工具
+* 支持流式响应
 
 ## 联系方式
+
 -------------
 
-*   QQ：733737715
+* QQ：733737715
