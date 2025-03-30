@@ -391,3 +391,7 @@ miniluma/
 -------------
 
 * QQ：733737715
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=Codeium/MiniLuma&type=Date)](https://star-history.com/#Codeium/MiniLuma&Date)
