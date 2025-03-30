@@ -189,6 +189,21 @@ MiniLuma提供了一个现代化的Web界面，方便用户通过浏览器进行
 - **代码查看**：支持语法高亮的代码查看功能
 - **文件下载**：一键下载生成的代码文件
 
+### 开启方式
+
+1. 确保已安装所有依赖：
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. 启动Web服务器：
+   ```bash
+   python start_web.py
+   ```
+
+3. 打开浏览器访问：
+   [http://localhost:8080](http://localhost:8080)
+
 ![首页](src/首页.png)
 ![界面1](src/界面1.png)
 ![界面2](src/界面2.png)
@@ -319,12 +334,22 @@ miniluma/
 ## 支持与赞赏
 
 如果您觉得MiniLuma对您有帮助，欢迎通过以下方式支持我们：
+- 您的赞助将用于帮助我们持续改进和完善 MiniLuma！
 
-![赞赏二维码微信](ui/web/static/img/zanshang/wechat.jpg)
-![赞赏二维码支付宝](ui/web/static/img/zanshang/zfb.jpg)
+<div style="display: flex; justify-content: space-between; max-width: 600px; margin: 0 auto;">
+  <div style="flex: 1; margin-right: 20px;">
+    ![赞赏二维码微信](ui/web/static/img/zanshang/wechat.jpg)
+  </div>
+  <div style="flex: 1;">
+    ![赞赏二维码支付宝](ui/web/static/img/zanshang/zfb.jpg)
+  </div>
+</div>
 
+## Sponsors & Supporters 【赞助商 & 支持者】
+ - Qutanfang 5￥/CNY
+ - 云中海 15￥/CNY
 
-您的支持将帮助我们持续改进和完善MiniLuma！
+    # 感谢以上人员/企业的支持！
 
 ## 后续开发计划
 -----------------
