@@ -394,4 +394,4 @@ miniluma/
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Codeium/MiniLuma&type=Date)](https://star-history.com/#Codeium/MiniLuma&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=Vistaminc/MiniLuma&type=Date)](https://star-history.com/#Vistaminc/MiniLuma&Date)
