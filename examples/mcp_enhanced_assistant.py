@@ -71,7 +71,7 @@ class MCPEnhancedAssistant:
             "progress": None,
             "timestamp": datetime.datetime.now().isoformat()
         }
-        self.api_base_url = "http://localhost:8000"  # API服务器地址
+        self.api_base_url = "http://localhost:9788"  # API服务器地址
         
         # 项目根目录 (用于文件保存)
         # 获取脚本所在目录的上一级目录，即项目根目录

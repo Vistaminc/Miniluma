@@ -15,21 +15,23 @@
             cursor: pointer;
             display: inline-flex;
             align-items: center;
-            color: #666;
+            color: var(--text-light);
             font-size: 14px;
             margin-left: 15px;
-            padding: 5px 10px;
-            border-radius: 4px;
-            transition: background-color 0.3s, color 0.3s;
+            padding: 8px 12px;
+            border-radius: var(--radius-md);
+            transition: all var(--transition-fast);
         }
         
         .nav-item:hover {
-            background-color: rgba(82, 158, 204, 0.1);
-            color: #3498db;
+            background-color: rgba(58, 134, 255, 0.08);
+            color: var(--primary-color);
+            transform: translateY(-1px);
         }
         
         .nav-item i {
-            margin-right: 5px;
+            margin-right: 8px;
+            font-size: 16px;
         }
         
         .nav-item a {
@@ -38,29 +40,34 @@
         }
         
         /* 赞赏按钮和弹窗样式 */
-        .donate-popup {
-            position: absolute;
-            top: 40px;
-            right: 0;
+        #donatePopupContainer {
+            position: fixed;
+            top: 60px;
+            right: 20px;
             width: 320px;
             background: white;
-            border-radius: 8px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-            padding: 15px;
-            z-index: 100;
+            border-radius: var(--radius-lg);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+            padding: 20px;
+            z-index: 99999;
             display: none;
-            transition: opacity 0.3s;
+            transition: all var(--transition-normal);
             text-align: center;
+            border: 1px solid var(--border-color);
         }
         
-        .donate-popup h3 {
+        .donate-btn {
+            position: relative;
+        }
+        
+        #donatePopupContainer h3 {
             margin-top: 0;
-            color: #333;
+            color: var(--text-color);
             font-size: 16px;
             margin-bottom: 8px;
         }
         
-        .donate-popup h4 {
+        #donatePopupContainer h4 {
             margin: 0 0 15px;
             color: #ff6b6b;
             font-size: 14px;
@@ -80,54 +87,60 @@
         
         .donate-qr-item img {
             width: 100%;
-            border-radius: 4px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+            transition: transform var(--transition-fast);
+        }
+        
+        .donate-qr-item img:hover {
+            transform: scale(1.03);
         }
         
         .donate-qr-item p {
             margin: 5px 0 0;
             font-size: 12px;
-            color: #666;
+            color: var(--text-light);
         }
         
         .developer-info {
             margin-top: 15px;
             font-size: 12px;
-            color: #666;
+            color: var(--text-light);
             text-align: center;
-            border-top: 1px dashed #eee;
-            padding-top: 10px;
+            border-top: 1px dashed var(--border-color);
+            padding-top: 12px;
         }
         
         .developer-info p {
-            margin: 3px 0;
+            margin: 5px 0;
         }
         
         .developer-contact {
-            margin-top: 5px;
+            margin-top: 8px;
             display: flex;
             justify-content: center;
-            gap: 10px;
+            gap: 12px;
         }
         
         .developer-contact a {
-            color: #3498db;
+            color: var(--primary-color);
             text-decoration: none;
             font-size: 14px;
+            transition: color var(--transition-fast);
         }
         
         .developer-contact a:hover {
-            text-decoration: underline;
+            color: var(--primary-dark);
         }
         
-        /* 页脚样式压缩 */
+        /* 页脚样式 */
         .app-footer {
-            background-color: #f8f9fa;
-            border-top: 1px solid #eaeaea;
-            padding: 5px 0;
-            font-size: 12px;
-            color: #666;
-            margin-top: 10px;
+            background-color: var(--bg-light);
+            border-top: 1px solid var(--border-color);
+            padding: 12px 0;
+            font-size: 13px;
+            color: var(--text-light);
+            margin-top: 20px;
         }
         
         .footer-content {
@@ -162,32 +175,8 @@
                     <li class="nav-item">
                         <a href="https://miniluma.readthedocs.io/" target="_blank" class="nav-link"><i class="fas fa-book"></i> 官方文档</a>
                     </li>
-                    <li class="nav-item">
+                    <li class="nav-item donate-btn">
                         <i class="fas fa-gift" style="color: #ff6b6b;"></i> 赞赏支持
-                        <div class="donate-popup">
-                            <h3>❤️ 请作者喝杯咖啡吧 ☕</h3>
-                            <h4>您的支持是我们持续创新的动力！</h4>
-                            <div class="donate-qr-container">
-                                <div class="donate-qr-item">
-                                    <img src="{{ url_for('static', filename='img/zanshang/wechat.jpg') }}" alt="微信赞赏码">
-                                    <p>微信赞赏</p>
-                                </div>
-                                <div class="donate-qr-item">
-                                    <img src="{{ url_for('static', filename='img/zanshang/zfb.jpg') }}" alt="支付宝赞赏码">
-                                    <p>支付宝赞赏</p>
-                                </div>
-                            </div>
-                            <div class="developer-info">
-                                <p><strong>开发者：Vistamin团队</strong></p>
-                                <p>来自河南·郑州的高中生团队</p>
-                                <p>我们致力于打造智能、高效、开源的AI助手系统</p>
-                                <p>每一笔赞赏都将用于服务维护和功能开发</p>
-                                <div class="developer-contact">
-                                    <a href="vistamin@outlook.com"><i class="fas fa-envelope"></i> 邮箱</a>
-                                    <a href="https://t.me/blank" target="_blank"><i class="fab fa-telegram"></i> Telegram</a>
-                                </div>
-                            </div>
-                        </div>
                     </li>
                 </ul>
             </nav>
@@ -204,13 +193,39 @@
         </footer>
     </div>
 
+    <!-- 赞赏弹窗 - 移至页面根级别 -->
+    <div id="donatePopupContainer">
+        <h3>❤️ 请作者喝杯咖啡吧 ☕</h3>
+        <h4>您的支持是我们持续创新的动力！</h4>
+        <div class="donate-qr-container">
+            <div class="donate-qr-item">
+                <img src="{{ url_for('static', filename='img/zanshang/wechat.jpg') }}" alt="微信赞赏码">
+                <p>微信赞赏</p>
+            </div>
+            <div class="donate-qr-item">
+                <img src="{{ url_for('static', filename='img/zanshang/zfb.jpg') }}" alt="支付宝赞赏码">
+                <p>支付宝赞赏</p>
+            </div>
+        </div>
+        <div class="developer-info">
+            <p><strong>开发者：Vistamin团队</strong></p>
+            <p>来自河南·郑州的高中生团队</p>
+            <p>我们致力于打造智能、高效、开源的AI助手系统</p>
+            <p>每一笔赞赏都将用于服务维护和功能开发</p>
+            <div class="developer-contact">
+                <a href="mailto:vistamin@outlook.com"><i class="fas fa-envelope"></i> 邮箱</a>
+                <a href="https://t.me/blank" target="_blank"><i class="fab fa-telegram"></i> Telegram</a>
+            </div>
+        </div>
+    </div>
+
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     {% block extra_js %}{% endblock %}
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             // 获取赞赏按钮和弹窗元素
-            const donateBtn = document.querySelector('.nav-item i.fa-gift').parentNode;
-            const donatePopup = donateBtn.querySelector('.donate-popup');
+            const donateBtn = document.querySelector('.donate-btn');
+            const donatePopup = document.getElementById('donatePopupContainer');
             let isClickActivated = false; // 记录是否通过点击激活
             
             // 点击按钮切换弹窗显示状态
@@ -252,9 +267,9 @@
                 e.stopPropagation();
             });
             
-            // 点击页面其他区域时关闭弹窗
+            // 点击页面其他区域关闭弹窗
             document.addEventListener('click', function() {
-                if (donatePopup.style.display === 'block') {
+                if (isClickActivated) {
                     donatePopup.style.display = 'none';
                     isClickActivated = false;
                 }

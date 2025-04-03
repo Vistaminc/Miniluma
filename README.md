@@ -214,7 +214,7 @@ MiniLuma提供了一个现代化的Web界面，方便用户通过浏览器进行
    ```
 
 3. 打开浏览器访问：
-   [http://localhost:8080](http://localhost:8080)
+   [http://localhost:9787](http://localhost:9787)
 
 ![首页](src/首页.png)
 ![界面1](src/界面1.png)

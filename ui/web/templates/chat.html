@@ -198,100 +198,77 @@ document.addEventListener('DOMContentLoaded', function() {
             addMessage('assistant', data.message);
             
             // 如果有生成的文件，刷新文件列表
-            if (data.saved_files && data.saved_files.length > 0) {
-                refreshFilesList();
-            }
+            refreshFilesList();
             
-            // 滚动到底部
-            scrollToBottom();
         } catch (error) {
+            console.error('发送消息错误:', error);
+            
             // 停止轮询智能体状态
             stopStatusPolling();
             
             // 移除加载指示器
             removeLoadingMessage();
             
-            // 显示错误消息
-            addErrorMessage(error.message);
+            // 显示错误信息
+            addErrorMessage(`发送消息失败: ${error.message}`);
         }
     });
     
-    // 刷新文件列表
-    refreshFilesBtn.addEventListener('click', refreshFilesList);
-    
-    // 保存文件
-    saveFilesBtn.addEventListener('click', async function() {
-        try {
-            const response = await fetch(`/api/assistants/${assistantId}/save-files`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ assistant_id: assistantId })
-            });
-            
-            if (!response.ok) {
-                throw new Error('保存文件失败');
-            }
-            
-            const data = await response.json();
-            
-            // 显示成功消息
-            addSystemMessage(data.message);
-            
-            // 刷新文件列表
-            refreshFilesList();
-        } catch (error) {
-            addErrorMessage(`保存文件失败: ${error.message}`);
-        }
+    // 刷新文件列表按钮
+    refreshFilesBtn.addEventListener('click', function() {
+        // 更改按钮图标状态表示正在刷新
+        this.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        
+        // 请求刷新文件列表
+        refreshFilesList().then(() => {
+            // 恢复按钮图标
+            this.innerHTML = '<i class="fas fa-sync-alt"></i>';
+        });
     });
     
-    // 结束会话
+    // 保存文件按钮 - 更新为下载ZIP文件
+    saveFilesBtn.addEventListener('click', function() {
+        // 检查是否有文件可以下载
+        const hasFiles = !filesContainer.querySelector('.empty-state-text');
+        
+        if (!hasFiles) {
+            addSystemMessage("没有可下载的文件");
+            return;
+        }
+        
+        // 修改为直接跳转到下载所有文件的API端点，自动触发文件下载
+        window.location.href = `/api/assistants/${assistantId}/download-all`;
+    });
+    
+    // 结束会话按钮
     endSessionBtn.addEventListener('click', function() {
-        // 显示确认对话框
         showConfirmDialog(
-            '结束会话',
-            '确定要结束当前会话吗？这将保存所有状态并清除活跃会话。',
-            endSession
+            "结束会话",
+            "确定要结束当前会话吗？所有未保存的内容将丢失。",
+            async function() {
+                try {
+                    // 发送结束会话请求
+                    const response = await fetch(`/api/assistants/${assistantId}/end-session`, {
+                        method: 'POST'
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('结束会话失败');
+                    }
+                    
+                    // 会话结束成功，重定向到首页
+                    window.location.href = '/';
+                } catch (error) {
+                    console.error('结束会话错误:', error);
+                    addErrorMessage(`结束会话失败: ${error.message}`);
+                }
+            }
         );
     });
     
-    // 结束会话的实际处理函数
-    async function endSession() {
-        try {
-            const response = await fetch(`/api/assistants/${assistantId}/end-session`, {
-                method: 'POST'
-            });
-            
-            if (!response.ok) {
-                throw new Error('结束会话失败');
-            }
-            
-            const data = await response.json();
-            
-            // 更新会话状态指示器
-            document.getElementById('conversationStatus').innerHTML = 
-                '<span class="status-indicator inactive"></span> 会话已结束';
-            
-            // 显示成功消息
-            addSystemMessage('会话已结束，所有状态已保存');
-            
-            // 禁用输入框和按钮
-            messageInput.disabled = true;
-            endSessionBtn.disabled = true;
-            document.querySelector('.send-btn').disabled = true;
-            
-            // 5秒后重定向到主页
-            setTimeout(() => {
-                window.location.href = '/';
-            }, 5000);
-        } catch (error) {
-            addErrorMessage(`结束会话失败: ${error.message}`);
-        }
-    }
-    
     // 显示确认对话框
     function showConfirmDialog(title, message, confirmCallback) {
+        // 设置对话框内容
         confirmTitle.textContent = title;
         confirmMessage.textContent = message;
         

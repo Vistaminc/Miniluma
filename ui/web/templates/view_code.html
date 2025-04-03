@@ -2,81 +2,388 @@
 
 {% block title %}查看文件 - {{ file_name }}{% endblock %}
 
-{% block content %}
-<div class="container mx-auto px-4 py-8">
-    <div class="flex items-center justify-between mb-6">
-        <div>
-            <h1 class="text-2xl font-bold text-gray-800">{{ file_name }}</h1>
-            <p class="text-sm text-gray-600">{{ file_path }}</p>
-        </div>
-        <div>
-            <a href="/api/download/{{ assistant_id }}/{{ file_name }}" 
-               class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-md inline-flex items-center"
-               download="{{ file_name }}">
-                <i class="fas fa-download mr-2"></i> 下载文件
-            </a>
-            <a href="/chat/{{ assistant_id }}" 
-               class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md inline-flex items-center ml-2">
-                <i class="fas fa-arrow-left mr-2"></i> 返回对话
-            </a>
-        </div>
-    </div>
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github.min.css">
+<style>
+    /* 基础布局 */
+    .page-container {
+        padding: 2rem;
+        max-width: 1600px;
+        margin: 0 auto;
+    }
+    
+    /* 代码查看卡片 */
+    .code-card {
+        background-color: var(--bg-color);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-md);
+        border: 1px solid var(--border-color);
+        margin-bottom: 2rem;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    /* 代码头部 */
+    .code-header {
+        padding: 1rem 1.5rem;
+        border-bottom: 1px solid var(--border-color);
+        background-color: var(--bg-light);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+    
+    .file-info {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .file-title {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: var(--text-color);
+    }
+    
+    .file-title i {
+        color: var(--primary-color);
+    }
+    
+    .file-path {
+        font-size: 0.875rem;
+        color: var(--text-light);
+    }
+    
+    .file-meta {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        font-size: 0.8rem;
+        color: var(--text-light);
+    }
+    
+    .file-meta-item {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+    }
+    
+    .header-actions {
+        display: flex;
+        gap: 0.75rem;
+    }
+    
+    /* 代码内容区域 */
+    .code-content-wrapper {
+        position: relative;
+        overflow: auto; /* 确保可以滚动 */
+        flex: 1;
+        min-height: 400px;
+        max-height: 800px; /* 设置最大高度 */
+    }
+    
+    .code-content {
+        overflow: visible; /* 内容可能溢出 */
+        background-color: #f8f9fc;
+        position: relative;
+        min-width: 100%; /* 确保能容纳所有内容 */
+        padding-left: 3.5rem; /* 为行号留出空间 */
+    }
+    
+    /* 行号样式 */
+    .line-numbers {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 3.5rem;
+        background-color: #f1f5f9;
+        border-right: 1px solid #e2e8f0;
+        padding: 1rem 0;
+        text-align: right;
+        color: #94a3b8;
+        font-family: var(--font-mono);
+        font-size: 0.9rem;
+        user-select: none;
+        z-index: 2;
+    }
+    
+    .line-number {
+        display: block;
+        padding: 0 0.75rem;
+        line-height: 1.5;
+    }
+    
+    /* 代码样式 */
+    .code-block {
+        font-family: var(--font-mono);
+        font-size: 0.9rem;
+        line-height: 1.5;
+        margin: 0;
+        padding: 1rem 1rem 1rem 0; /* 右侧添加内边距 */
+        overflow: visible; /* 允许内容溢出 */
+    }
+    
+    .code-block code {
+        white-space: pre;
+        display: block;
+        tab-size: 4;
+        overflow: visible; /* 允许内容溢出 */
+    }
+    
+    /* 操作按钮 */
+    .btn-action {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        border-radius: var(--radius-md);
+        font-size: 0.875rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: none;
+    }
+    
+    .btn-primary {
+        background-color: var(--primary-color);
+        color: white;
+    }
+    
+    .btn-primary:hover {
+        background-color: var(--primary-dark);
+    }
+    
+    .btn-secondary {
+        background-color: var(--bg-dark);
+        color: var(--text-color);
+    }
+    
+    .btn-secondary:hover {
+        background-color: #e2e8f0;
+    }
+    
+    /* 成功提示样式 */
+    .toast {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 0.75rem 1rem;
+        background-color: var(--success-color);
+        color: white;
+        border-radius: var(--radius-md);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        transform: translateY(-100px);
+        opacity: 0;
+        transition: all 0.3s ease;
+        z-index: 1000;
+    }
+    
+    .toast.show {
+        transform: translateY(0);
+        opacity: 1;
+    }
+    
+    /* 响应式调整 */
+    @media (max-width: 768px) {
+        .page-container {
+            padding: 1rem;
+        }
+        
+        .code-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        
+        .header-actions {
+            width: 100%;
+            justify-content: space-between;
+        }
+        
+        .code-block {
+            font-size: 0.85rem;
+        }
+        
+        .line-numbers {
+            width: 2.5rem;
+            font-size: 0.85rem;
+        }
+    }
+</style>
+{% endblock %}
 
-    <div class="bg-white rounded-lg shadow-md overflow-hidden">
-        <div class="p-1 bg-gray-100 border-b flex justify-between items-center">
-            <div class="flex items-center text-sm text-gray-600">
-                <i class="fas fa-code mr-2"></i>
-                <span>{{ file_extension }}</span>
+{% block content %}
+<div class="page-container">
+    <div class="code-card">
+        <!-- 文件信息头部 -->
+        <div class="code-header">
+            <div class="file-info">
+                <div class="file-title">
+                    <i class="fas fa-file-code"></i>
+                    <span>{{ file_name }}</span>
+                </div>
+                <div class="file-path">{{ file_path }}</div>
+                <div class="file-meta">
+                    <div class="file-meta-item">
+                        <i class="fas fa-code"></i>
+                        <span>{{ code_language|upper }}</span>
+                    </div>
+                    <div class="file-meta-item">
+                        <i class="fas fa-align-left"></i>
+                        <span>{{ file_content.count('\n') + 1 }} 行代码</span>
+                    </div>
+                </div>
             </div>
-            <div>
-                <button id="copyBtn" class="text-gray-500 hover:text-gray-700 px-2 py-1 text-sm">
-                    <i class="fas fa-copy mr-1"></i> 复制代码
+            <div class="header-actions">
+                <button id="copyBtn" class="btn-action btn-secondary">
+                    <i class="fas fa-copy"></i>
+                    <span>复制代码</span>
                 </button>
+                <a href="/chat/{{ assistant_id }}" class="btn-action btn-primary">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>返回对话</span>
+                </a>
             </div>
         </div>
         
-        <!-- 代码内容，会被自动高亮 -->
-        <div class="p-0 overflow-auto">
-            <pre class="m-0"><code class="language-{{ code_language }}">{{ file_content }}</code></pre>
+        <!-- 代码内容区 -->
+        <div class="code-content-wrapper">
+            <div class="line-numbers" id="lineNumbers"></div>
+            <div class="code-content">
+                <pre class="code-block"><code id="codeBlock">{{ file_content }}</code></pre>
+            </div>
         </div>
     </div>
 </div>
 
 <!-- 复制成功提示 -->
-<div id="copyAlert" class="fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg transform transition-transform duration-300 translate-y-[-100px]">
-    <i class="fas fa-check-circle mr-2"></i> 代码已复制到剪贴板
+<div id="copyToast" class="toast">
+    <i class="fas fa-check-circle"></i>
+    <span>代码已复制到剪贴板</span>
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // 添加行号
+    const codeBlock = document.getElementById('codeBlock');
+    const lineNumbers = document.getElementById('lineNumbers');
+    const lines = codeBlock.textContent.split('\n');
+    
+    // 创建行号
+    for (let i = 1; i <= lines.length; i++) {
+        const lineNumber = document.createElement('span');
+        lineNumber.className = 'line-number';
+        lineNumber.textContent = i;
+        lineNumbers.appendChild(lineNumber);
+    }
+    
     // 应用代码高亮
-    document.querySelectorAll('pre code').forEach((block) => {
-        hljs.highlightElement(block);
+    try {
+        // 使用highlight.js进行语法高亮
+        if (hljs) {
+            hljs.highlightElement(codeBlock);
+        }
+    } catch (err) {
+        console.log('语法高亮失败:', err);
+    }
+    
+    // 同步滚动行号和代码
+    const codeWrapper = document.querySelector('.code-content-wrapper');
+    
+    codeWrapper.addEventListener('scroll', function() {
+        lineNumbers.style.top = (-codeWrapper.scrollTop) + 'px';
     });
     
     // 复制代码功能
     const copyBtn = document.getElementById('copyBtn');
-    const copyAlert = document.getElementById('copyAlert');
-    const codeElement = document.querySelector('pre code');
+    const copyToast = document.getElementById('copyToast');
     
     copyBtn.addEventListener('click', function() {
         // 获取代码内容
-        const codeText = codeElement.textContent;
+        const codeText = codeBlock.textContent;
         
         // 复制到剪贴板
-        navigator.clipboard.writeText(codeText).then(function() {
-            // 显示成功提示
-            copyAlert.style.transform = 'translateY(0)';
-            
-            // 3秒后隐藏提示
-            setTimeout(function() {
-                copyAlert.style.transform = 'translateY(-100px)';
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            // 使用现代API
+            navigator.clipboard.writeText(codeText)
+                .then(() => {
+                    showToast();
+                })
+                .catch(err => {
+                    console.error('复制失败 (API):', err);
+                    fallbackCopy();
+                });
+        } else {
+            // 后备方案
+            fallbackCopy();
+        }
+        
+        // 后备复制方法
+        function fallbackCopy() {
+            try {
+                const textarea = document.createElement('textarea');
+                textarea.value = codeText;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                
+                textarea.select();
+                const success = document.execCommand('copy');
+                document.body.removeChild(textarea);
+                
+                if (success) {
+                    showToast();
+                } else {
+                    alert('复制失败，请手动选择并复制代码');
+                }
+            } catch (err) {
+                console.error('复制失败:', err);
+                alert('复制失败，请手动选择并复制代码');
+            }
+        }
+        
+        // 显示成功提示
+        function showToast() {
+            copyToast.classList.add('show');
+            setTimeout(() => {
+                copyToast.classList.remove('show');
             }, 3000);
-        }).catch(function(err) {
-            console.error('无法复制文本: ', err);
-            alert('复制失败，请手动选择并复制代码');
-        });
+        }
     });
+    
+    // 调整代码容器高度以适应内容
+    function adjustCodeHeight() {
+        const codeWrapper = document.querySelector('.code-content-wrapper');
+        const windowHeight = window.innerHeight;
+        const headerHeight = document.querySelector('.code-header').offsetHeight;
+        const pageHeaderHeight = document.querySelector('.app-header').offsetHeight || 0;
+        const containerPadding = 64; // 2rem (top) + 2rem (bottom) = 4rem = 64px
+        
+        // 计算可用高度
+        const availableHeight = windowHeight - headerHeight - pageHeaderHeight - containerPadding;
+        const maxHeight = Math.max(400, Math.min(availableHeight * 0.8, 800)); // 最小400px，最大800px
+        
+        // 设置高度
+        codeWrapper.style.maxHeight = `${maxHeight}px`;
+        
+        // 确保行号高度与代码内容一致
+        lineNumbers.style.height = Math.max(codeWrapper.scrollHeight, codeWrapper.clientHeight) + 'px';
+    }
+    
+    // 初始调整和窗口大小改变时调整
+    adjustCodeHeight();
+    window.addEventListener('resize', adjustCodeHeight);
 });
 </script>
 {% endblock %}

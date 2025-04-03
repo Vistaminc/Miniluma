@@ -7,8 +7,10 @@ import sys
 import json
 import asyncio
 import traceback
+import zipfile
+import io
 from typing import Dict, List, Any, Optional
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session, send_from_directory
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, send_from_directory, send_file
 import requests
 import uuid
 import datetime
@@ -23,7 +25,7 @@ app = Flask(__name__,
 
 # 配置
 app.secret_key = str(uuid.uuid4())  # 用于session
-API_BASE_URL = "http://localhost:8000"  # MiniLuma API地址
+API_BASE_URL = "http://localhost:9788"  # MiniLuma API地址
 
 # 添加全局错误处理
 @app.errorhandler(Exception)
@@ -156,6 +158,70 @@ def save_files(assistant_id):
         return jsonify(response.json())
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+# 下载所有文件为zip压缩包
+@app.route('/api/assistants/<assistant_id>/download-all', methods=['GET'])
+def download_all_files_as_zip(assistant_id):
+    """将助手生成的所有文件打包为zip格式下载"""
+    try:
+        # 获取文件列表
+        response = requests.get(f"{API_BASE_URL}/assistants/{assistant_id}/files")
+        response.raise_for_status()
+        files_data = response.json()
+        
+        if not files_data.get('files') or len(files_data['files']) == 0:
+            return jsonify({"error": "没有可下载的文件"}), 404
+        
+        # 创建内存中的zip文件
+        memory_file = io.BytesIO()
+        with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            # 获取每个文件并添加到zip中
+            for original_path, saved_path in files_data['files'].items():
+                clean_filename = os.path.basename(saved_path)
+                
+                try:
+                    # 尝试下载文件内容
+                    try:
+                        file_response = requests.get(f"{API_BASE_URL}/assistants/{assistant_id}/download/{clean_filename}", stream=True)
+                        file_response.raise_for_status()
+                        file_content = file_response.content
+                    except Exception as e:
+                        # 尝试备用API
+                        file_response = requests.get(f"{API_BASE_URL}/assistants/{assistant_id}/files/content", 
+                                              params={"file_name": clean_filename})
+                        file_response.raise_for_status()
+                        
+                        # 如果是JSON响应，提取内容
+                        if 'application/json' in file_response.headers.get('Content-Type', ''):
+                            content_data = file_response.json()
+                            file_content = content_data.get("content", "").encode('utf-8')
+                        else:
+                            file_content = file_response.content
+                    
+                    # 使用原始路径作为zip内的路径（如果有）
+                    zip_path = original_path if original_path else clean_filename
+                    zipf.writestr(zip_path, file_content)
+                except Exception as e:
+                    print(f"添加文件 {clean_filename} 到zip时出错: {e}")
+                    # 继续处理其他文件
+        
+        # 将文件指针移到开头
+        memory_file.seek(0)
+        
+        # 生成下载文件名
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        download_filename = f"MiniLuma_files_{assistant_id}_{timestamp}.zip"
+        
+        return send_file(
+            memory_file,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=download_filename
+        )
+    except Exception as e:
+        error_msg = f"打包文件失败: {str(e)}"
+        print(error_msg)
+        return jsonify({"error": error_msg}), 500
 
 # 结束会话API端点
 @app.route('/api/assistants/<assistant_id>/end-session', methods=['POST'])
@@ -352,7 +418,7 @@ def download_file(assistant_id, filename):
         return jsonify({"error": error_msg}), 500
 
 # 启动服务器
-def run_web_server(host="0.0.0.0", port=8080, debug=True):
+def run_web_server(host="0.0.0.0", port=9787, debug=True):
     """启动Web服务器"""
     app.debug = True  # 启用调试模式以获取详细错误信息
     print("Web服务器调试模式已开启...")

@@ -859,7 +859,7 @@ async def delete_assistant(assistant_id: str):
         raise HTTPException(status_code=500, detail=f"删除助手失败: {str(e)}")
 
 # 主函数，启动API服务器
-async def start_api_server(host="0.0.0.0", port=8000, workers=1, use_signals=True):
+async def start_api_server(host="0.0.0.0", port=9788, workers=1, use_signals=True):
     """启动API服务器
     
     Args:

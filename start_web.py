@@ -23,9 +23,9 @@ def parse_arguments():
     """解析命令行参数"""
     parser = argparse.ArgumentParser(description='启动MiniLuma Web界面')
     parser.add_argument('--web-host', default='0.0.0.0', help='Web服务器主机地址 (默认: 0.0.0.0)')
-    parser.add_argument('--web-port', type=int, default=8080, help='Web服务器端口 (默认: 8080)')
+    parser.add_argument('--web-port', type=int, default=9787, help='Web服务器端口 (默认: 9787)')
     parser.add_argument('--api-host', default='0.0.0.0', help='API服务器主机地址 (默认: 0.0.0.0)')
-    parser.add_argument('--api-port', type=int, default=8000, help='API服务器端口 (默认: 8000)')
+    parser.add_argument('--api-port', type=int, default=9788, help='API服务器端口 (默认: 9788)')
     parser.add_argument('--no-browser', action='store_true', help='不自动打开浏览器')
     parser.add_argument('--debug', action='store_true', help='启用调试模式')
     

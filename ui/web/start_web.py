@@ -9,6 +9,7 @@ import threading
 import webbrowser
 import time
 import requests
+import asyncio
 from requests.exceptions import ConnectionError
 
 # 添加项目根目录到PATH
@@ -22,9 +23,9 @@ def parse_arguments():
     """解析命令行参数"""
     parser = argparse.ArgumentParser(description='启动MiniLuma Web界面')
     parser.add_argument('--web-host', default='0.0.0.0', help='Web服务器主机地址 (默认: 0.0.0.0)')
-    parser.add_argument('--web-port', type=int, default=8080, help='Web服务器端口 (默认: 8080)')
+    parser.add_argument('--web-port', type=int, default=9787, help='Web服务器端口 (默认: 9787)')
     parser.add_argument('--api-host', default='0.0.0.0', help='API服务器主机地址 (默认: 0.0.0.0)')
-    parser.add_argument('--api-port', type=int, default=8000, help='API服务器端口 (默认: 8000)')
+    parser.add_argument('--api-port', type=int, default=9788, help='API服务器端口 (默认: 9788)')
     parser.add_argument('--no-browser', action='store_true', help='不自动打开浏览器')
     parser.add_argument('--debug', action='store_true', help='启用调试模式')
     
@@ -45,11 +46,17 @@ def start_api_server_thread(host, port, debug=False):
     """在单独的线程中启动API服务器"""
     def _start_api():
         try:
-            # 使用asyncio.run运行异步协程函数
-            import asyncio
-            asyncio.run(start_api_server(host=host, port=port, workers=1, use_signals=False))
+            # 创建新的事件循环
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            # 运行异步API服务器
+            loop.run_until_complete(start_api_server(host=host, port=port, workers=1, use_signals=False))
+            loop.run_forever()
         except Exception as e:
             print(f"API服务器启动失败: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
     
     api_thread = threading.Thread(target=_start_api)
     api_thread.daemon = True
