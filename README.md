@@ -357,10 +357,10 @@ miniluma/
 
 <div style="display: flex; justify-content: space-between; max-width: 600px; margin: 0 auto;">
   <div style="flex: 1; margin-right: 20px;">
-    ![赞赏二维码微信](/ui/web/static/img/zanshang/wechat.jpg)
+    <img src="/ui/web/static/img/zanshang/wechat.jpg" alt="赞赏二维码微信" />
   </div>
   <div style="flex: 1;">
-    ![赞赏二维码支付宝](/ui/web/static/img/zanshang/zfb.jpg)
+    <img src="/ui/web/static/img/zanshang/zfb.jpg" alt="赞赏二维码支付宝" />
   </div>
 </div>
 
